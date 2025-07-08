@@ -7,7 +7,7 @@ import profile_icon from "../image/profile_icon.png";
 import locicon from "../image/lock_icon.svg";
 import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
-
+// import apiClient from "../utils/apiClient";
 const Login = () => {
   const [state, setState] = useState("Login");
   const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);

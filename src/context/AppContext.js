@@ -10,7 +10,10 @@ const AppContextProvider = ({ children }) => {
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
-  const backendUrl = process.env.REACT_APP_BACKEND_URL;
+
+  // ✅ Remove trailing slash from backend URL
+  const backendUrl = process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "");
+
   const navigate = useNavigate();
 
   // Persist token to localStorage
@@ -26,9 +29,8 @@ const AppContextProvider = ({ children }) => {
     try {
       const response = await axios.get("/api/user/credits", {
         headers: { token },
-        signal, // For aborting requests
+        signal,
       });
-
       if (response.data.success) {
         setCredit(response.data.credits);
         setUser(response.data.user);
@@ -38,7 +40,6 @@ const AppContextProvider = ({ children }) => {
         console.log("Request canceled:", error.message);
         return;
       }
-
       console.error("Error loading credits:", error);
       if (error.response?.status === 401) {
         setToken("");
@@ -65,7 +66,6 @@ const AppContextProvider = ({ children }) => {
         { prompt },
         { headers: { token } }
       );
-
       if (response.data.success) {
         loadCreditsData();
         return response.data.resultImage;
