@@ -1,5 +1,3 @@
-// src/component/Login.jsx
-
 import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
@@ -7,7 +5,7 @@ import profile_icon from "../image/profile_icon.png";
 import locicon from "../image/lock_icon.svg";
 import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
-// import apiClient from "../utils/apiClient";
+
 const Login = () => {
   const [state, setState] = useState("Login");
   const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);
@@ -19,18 +17,19 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      const url =
-        state === "Login"
-          ? "/api/user/login"
-          : "/api/user/register";
+      // Ensure no trailing or leading slashes in URL
+      const trimmedBackendUrl = backendUrl?.trim().replace(/\/+$/, "");
+      const url = state === "Login" ? "/api/user/login" : "/api/user/register";
+      const fullUrl = `${trimmedBackendUrl}${url}`;
+
+      console.log("Sending request to:", fullUrl); // Debugging
 
       const payload =
         state === "Login"
           ? { email, password }
           : { name, email, password };
 
-      // ✅ Use backendUrl from context to point to live backend
-      const { data } = await axios.post(`${backendUrl}${url}`, payload);
+      const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
         setToken(data.token);
@@ -43,7 +42,20 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Auth error:", error);
-      alert(error.response?.data?.message || "Network error. Try again.");
+      let errorMessage = "Network error. Try again.";
+
+      if (error.response) {
+        // Server responded with a status code outside 2xx
+        errorMessage = error.response.data.message || error.response.statusText;
+      } else if (error.request) {
+        // No response received
+        errorMessage = "Request failed. Please check your internet connection.";
+      } else {
+        // Something went wrong while setting up the request
+        errorMessage = error.message;
+      }
+
+      alert(errorMessage);
     }
   };
 
