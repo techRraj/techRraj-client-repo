@@ -34,6 +34,7 @@ const Login = () => {
       if (data.success) {
         setToken(data.token);
         setUser(data.user);
+        setCredit(data.user.creditBalance); // ✅ Set initial credit from user object
         localStorage.setItem("token", data.token);
         setShowLogin(false);
         alert(data.message || "Success!");
