@@ -12,7 +12,7 @@ import NotFound from "./page/NotFound";
 import { ToastContainer } from 'react-toastify';
 import Login from "./component/Login";
 import './App.css';
-import 'bootstrap/dist/css/bootstrap.min.css';
+
 // ✅ Wrap everything with <Router> here
 const App = () => {
   return (

@@ -8,7 +8,7 @@ import cross_icon from "../image/cross_icon.svg";
 
 const Login = () => {
   const [state, setState] = useState("Login");
-  const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);
+  const { setShowLogin, backendUrl, setToken, setUser ,setCredit } = useContext(AppContext);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,12 +32,12 @@ const Login = () => {
       const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
-        setToken(data.token);
-        setUser(data.user);
-        setCredit(data.user.creditBalance); // ✅ Set initial credit from user object
-        localStorage.setItem("token", data.token);
-        setShowLogin(false);
-        alert(data.message || "Success!");
+       setToken(data.token);
+setUser(data.user); // ✅ Sets full user object
+setCredit(data.user.creditBalance); // ✅ Sets correct credit balance
+localStorage.setItem("token", data.token);
+setShowLogin(false);
+alert("Success!");
       } else {
         alert(data.message || "Something went wrong");
       }
