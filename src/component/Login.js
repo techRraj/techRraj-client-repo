@@ -63,7 +63,7 @@ alert("Success!");
   return (
     <div className="login-container">
       <form onSubmit={onSubmitHandler} className="login-form">
-        <h1 className="login-lg">{state}</h1>
+        <h1 className="login-lg" style={{color :" white "}}>{state}</h1>
         <p className="login-txt">Welcome back! Please sign in to continue</p>
 
         {state !== "Login" && (
