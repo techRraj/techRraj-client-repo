@@ -8,7 +8,7 @@ import cross_icon from "../image/cross_icon.svg";
 
 const Login = () => {
   const [state, setState] = useState("Login");
-  const { setShowLogin, backendUrl, setToken, setUser ,setCredit } = useContext(AppContext);
+  const { setShowLogin, backendUrl, setToken, setUser, setCredit } = useContext(AppContext);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +18,7 @@ const Login = () => {
 
     try {
       // Ensure no trailing or leading slashes in URL
-      const trimmedBackendUrl = backendUrl?.trim().replace(/\/+$/, "");
+      const trimmedBackendUrl = backendUrl?.replace(/\/+$/, "");
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const fullUrl = `${trimmedBackendUrl}${url}`;
 
@@ -32,12 +32,12 @@ const Login = () => {
       const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
-       setToken(data.token);
-setUser(data.user); // ✅ Sets full user object
-setCredit(data.user.creditBalance); // ✅ Sets correct credit balance
-localStorage.setItem("token", data.token);
-setShowLogin(false);
-alert("Success!");
+        setToken(data.token);
+        setUser(data.user); // ✅ Sets full user object
+        setCredit(data.user.creditBalance); // ✅ Sets correct credit balance
+        localStorage.setItem("token", data.token);
+        setShowLogin(false);
+        alert("Success!");
       } else {
         alert(data.message || "Something went wrong");
       }
@@ -63,7 +63,7 @@ alert("Success!");
   return (
     <div className="login-container">
       <form onSubmit={onSubmitHandler} className="login-form">
-        <h1 className="login-lg" style={{color :" white "}}>{state}</h1>
+        <h1 className="login-lg" style={{ color: " white " }}>{state}</h1>
         <p className="login-txt">Welcome back! Please sign in to continue</p>
 
         {state !== "Login" && (
