@@ -10,6 +10,8 @@ const AppContextProvider = ({ children }) => {
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
+
+  // ✅ Remove trailing slash from backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "");
 
   const navigate = useNavigate();
@@ -23,31 +25,37 @@ const AppContextProvider = ({ children }) => {
     }
   }, [token]);
 
- const loadCreditsData = useCallback(async (signal) => {
-  try {
-    const response = await axios.get("/api/user/credits", {
-      headers: { token },
-      signal,
-    });
-    if (response.data.success) {
-      setCredit(response.data.credits); // Ensure this updates credit state
-      setUser(response.data.user);
+  const loadCreditsData = useCallback(async (signal) => {
+    try {
+      console.log("Fetching credits...");
+      const response = await axios.get("/api/user/credits", {
+        headers: { token },
+        signal,
+      });
+      console.log("Credits fetched:", response.data);
+      if (response.data.success) {
+        console.log("Updating credit state:", response.data.credits);
+        setCredit(response.data.credits);
+        setUser(response.data.user);
+      } else {
+        console.error("Failed to fetch credits:", response.data.message);
+        toast.error(response.data.message || "Failed to load user data.");
+      }
+    } catch (error) {
+      console.error("Error loading credits:", error);
+      if (axios.isCancel(error)) {
+        console.log("Request canceled:", error.message);
+        return;
+      }
+      if (error.response?.status === 401) {
+        setToken("");
+        setUser(null);
+        toast.error("Session expired. Please log in again.");
+      } else {
+        toast.error("Failed to load user data.");
+      }
     }
-  } catch (error) {
-    if (axios.isCancel(error)) {
-      console.log("Request canceled:", error.message);
-      return;
-    }
-    console.error("Error loading credits:", error);
-    if (error.response?.status === 401) {
-      setToken("");
-      setUser(null);
-      toast.error("Session expired. Please log in again.");
-    } else {
-      toast.error("Failed to load user data.");
-    }
-  }
-}, [token]);
+  }, [token]);
 
   useEffect(() => {
     if (token) {
