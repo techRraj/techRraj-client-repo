@@ -30,7 +30,7 @@ const Navbar = () => {
           <button onClick={() => navigate('/buy')} className="nav-btn">
             <img src={star_icon} alt="Star Icon" className="nav-img" />
 {/* <p className='nav-p'>Credits left: {user.credit ||5}</p>    */}
-<p className='nav-p'>Credits left: {user.credit ||5}</p>  
+{/* <p className='nav-p'>Credits left: {user.credit ||5}</p>   */}
           </button>
           <p className='nav-pi'>Hi, {user?.name || "Guest"}</p>
 
