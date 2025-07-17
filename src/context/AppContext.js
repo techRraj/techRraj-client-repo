@@ -10,8 +10,6 @@ const AppContextProvider = ({ children }) => {
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
-
-  // ✅ Remove trailing slash from backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "");
 
   const navigate = useNavigate();

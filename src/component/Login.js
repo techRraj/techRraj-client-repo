@@ -8,7 +8,7 @@ import cross_icon from "../image/cross_icon.svg";
 
 const Login = () => {
   const [state, setState] = useState("Login");
-  const { setShowLogin, backendUrl, setToken, setUser, setCredit } = useContext(AppContext);
+  const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,23 +17,14 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      // Trim any trailing slash from backend URL
-      const trimmedBackendUrl = backendUrl?.replace(/\/+$/, "");
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
-      const fullUrl = `${trimmedBackendUrl}${url}`;
+      const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      const payload =
-        state === "Login"
-          ? { email, password }
-          : { name, email, password };
-
-      const { data } = await axios.post(fullUrl, payload);
+      const { data } = await axios.post(`${backendUrl}${url}`, payload);
 
       if (data.success) {
-        // ✅ This is where you update token, user, and credit
         setToken(data.token);
         setUser(data.user);
-        setCredit(data.user.creditBalance); // ✅ Update credit balance here
         localStorage.setItem("token", data.token);
         setShowLogin(false);
         alert("Success!");
@@ -42,17 +33,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Auth error:", error);
-      let errorMessage = "Network error. Try again.";
-
-      if (error.response) {
-        errorMessage = error.response.data.message || error.response.statusText;
-      } else if (error.request) {
-        errorMessage = "Request failed. Please check your internet connection.";
-      } else {
-        errorMessage = error.message;
-      }
-
-      alert(errorMessage);
+      alert(error.response?.data?.message || "Network error. Try again.");
     }
   };
 
@@ -105,16 +86,12 @@ const Login = () => {
         {state === "Login" ? (
           <p className="login-reg">
             Don’t have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Sign Up")}>
-              Sign up
-            </span>
+            <span onClick={() => setState("Sign Up")}>Sign up</span>
           </p>
         ) : (
           <p className="login-already">
             Already have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Login")}>
-              Login
-            </span>
+            <span onClick={() => setState("Login")}>Login</span>
           </p>
         )}
 
