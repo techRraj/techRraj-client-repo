@@ -23,31 +23,31 @@ const AppContextProvider = ({ children }) => {
     }
   }, [token]);
 
-  const loadCreditsData = useCallback(async (signal) => {
-    try {
-      const response = await axios.get("/api/user/credits", {
-        headers: { token },
-        signal,
-      });
-      if (response.data.success) {
-        setCredit(response.data.credits);
-        setUser(response.data.user);
-      }
-    } catch (error) {
-      if (axios.isCancel(error)) {
-        console.log("Request canceled:", error.message);
-        return;
-      }
-      console.error("Error loading credits:", error);
-      if (error.response?.status === 401) {
-        setToken("");
-        setUser(null);
-        toast.error("Session expired. Please log in again.");
-      } else {
-        toast.error("Failed to load user data.");
-      }
+ const loadCreditsData = useCallback(async (signal) => {
+  try {
+    const response = await axios.get("/api/user/credits", {
+      headers: { token },
+      signal,
+    });
+    if (response.data.success) {
+      setCredit(response.data.credits); // Ensure this updates credit state
+      setUser(response.data.user);
     }
-  }, [token]);
+  } catch (error) {
+    if (axios.isCancel(error)) {
+      console.log("Request canceled:", error.message);
+      return;
+    }
+    console.error("Error loading credits:", error);
+    if (error.response?.status === 401) {
+      setToken("");
+      setUser(null);
+      toast.error("Session expired. Please log in again.");
+    } else {
+      toast.error("Failed to load user data.");
+    }
+  }
+}, [token]);
 
   useEffect(() => {
     if (token) {
