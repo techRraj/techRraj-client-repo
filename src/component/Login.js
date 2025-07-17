@@ -17,12 +17,10 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      // Ensure no trailing or leading slashes in URL
+      // Trim any trailing slash from backend URL
       const trimmedBackendUrl = backendUrl?.replace(/\/+$/, "");
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const fullUrl = `${trimmedBackendUrl}${url}`;
-
-      console.log("Sending request to:", fullUrl); // Debugging
 
       const payload =
         state === "Login"
@@ -32,9 +30,10 @@ const Login = () => {
       const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
+        // ✅ This is where you update token, user, and credit
         setToken(data.token);
-        setUser(data.user); // ✅ Sets full user object
-        setCredit(data.user.creditBalance); // ✅ Sets correct credit balance
+        setUser(data.user);
+        setCredit(data.user.creditBalance); // ✅ Update credit balance here
         localStorage.setItem("token", data.token);
         setShowLogin(false);
         alert("Success!");
@@ -46,13 +45,10 @@ const Login = () => {
       let errorMessage = "Network error. Try again.";
 
       if (error.response) {
-        // Server responded with a status code outside 2xx
         errorMessage = error.response.data.message || error.response.statusText;
       } else if (error.request) {
-        // No response received
         errorMessage = "Request failed. Please check your internet connection.";
       } else {
-        // Something went wrong while setting up the request
         errorMessage = error.message;
       }
 
@@ -63,7 +59,7 @@ const Login = () => {
   return (
     <div className="login-container">
       <form onSubmit={onSubmitHandler} className="login-form">
-        <h1 className="login-lg" style={{ color: " white " }}>{state}</h1>
+        <h1 className="login-lg">{state}</h1>
         <p className="login-txt">Welcome back! Please sign in to continue</p>
 
         {state !== "Login" && (
