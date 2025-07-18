@@ -20,16 +20,12 @@ const Login = () => {
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      // ✅ Use backendUrl from context to point to live backend
       const fullUrl = `${backendUrl}${url}`;
-      console.log("Sending request to:", fullUrl); // Debugging
 
-      const { data } = await axios.post(fullUrl, payload, {
-        headers: { token },
-        withCredentials: true // ✅ Ensure withCredentials is set
-      });
+      const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
+        // ✅ Set token and user after response
         setToken(data.token);
         setUser(data.user);
         setCredit(data.user.creditBalance); // ✅ Set credit balance
@@ -94,16 +90,12 @@ const Login = () => {
         {state === "Login" ? (
           <p className="login-reg">
             Don’t have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Sign Up")}>
-              Sign up
-            </span>
+            <span onClick={() => setState("Sign Up")}>Sign up</span>
           </p>
         ) : (
           <p className="login-already">
             Already have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Login")}>
-              Login
-            </span>
+            <span onClick={() => setState("Login")}>Login</span>
           </p>
         )}
 

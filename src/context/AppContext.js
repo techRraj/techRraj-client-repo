@@ -11,7 +11,7 @@ const AppContextProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // Remove trailing slash from backend URL
+  // ✅ Remove trailing slash from backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "");
 
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ const AppContextProvider = ({ children }) => {
     try {
       console.log("Fetching credits...");
       const response = await axios.get("/api/user/credits", {
-        headers: { token },
+        headers: { Authorization: `Bearer ${token}` }, // ✅ Use Authorization header
         signal,
       });
       console.log("Credits fetched:", response.data);
@@ -70,7 +70,7 @@ const AppContextProvider = ({ children }) => {
       const response = await axios.post(
         "/api/image/generate-image",
         { prompt },
-        { headers: { token } }
+        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Authorization header
       );
       if (response.data.success) {
         loadCreditsData();
