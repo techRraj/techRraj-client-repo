@@ -22,7 +22,9 @@ const Login = () => {
 
       const fullUrl = `${backendUrl}${url}`;
 
-      const { data } = await axios.post(fullUrl, payload);
+      const { data } = await axios.post(fullUrl, payload , {
+        withCredentials: true
+      });
 
       if (data.success) {
         // ✅ Set token and user after response
