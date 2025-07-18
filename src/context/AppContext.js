@@ -66,26 +66,24 @@ const AppContextProvider = ({ children }) => {
   }, [token, loadCreditsData]);
 
   const generateImage = async (prompt) => {
-    try {
-      const response = await axios.post(
-        "/api/image/generate-image",
-        { prompt },
-        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Authorization header
-      );
-      if (response.data.success) {
-        loadCreditsData();
-        return response.data.resultImage;
-      } else {
-        toast.error(response.data.message || "Failed to generate image");
-        if (response.data.creditBalance === 0) {
-          navigate("/buy");
-        }
+  try {
+    const response = await axios.post("/api/image/generate-image", { prompt }, {
+      headers: { token },
+    });
+    if (response.data.success) {
+      loadCreditsData(); // Reload credit balance
+      return response.data.resultImage;
+    } else {
+      toast.error(response.data.message || "Failed to generate image");
+      if (response.data.creditBalance === 0) {
+        navigate("/buy");
       }
-    } catch (error) {
-      toast.error("Error generating image.");
-      console.error("Generate Image Error:", error);
     }
-  };
+  } catch (error) {
+    toast.error("Error generating image.");
+    console.error("Generate Image Error:", error);
+  }
+};
 
   const logout = () => {
     setToken("");
