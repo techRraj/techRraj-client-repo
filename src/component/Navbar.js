@@ -29,9 +29,11 @@ const Navbar = () => {
         <div className="nav-sec1">
           <button onClick={() => navigate('/buy')} className="nav-btn">
             <img src={star_icon} alt="Star Icon" className="nav-img" />
-<p className='nav-p'>Credits left: {credit}</p>  
+            <p className='nav-p'>
+              {credit >= 0 ? `Credits left: ${credit}` : 'Loading...'}
+            </p>
           </button>
-          <p className='nav-pi'>Hi, {user?.name || "Guest"}</p>
+          <p className='nav-pi'>Hi, {user.name}</p>
 
           <div className='nav-proicon'>
             <img src={profile_icon} className='nav-pro' alt="Profile" />
