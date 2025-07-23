@@ -1,26 +1,27 @@
 // src/components/Login.jsx
-import React, { useContext, useState ,toast} from "react";
+import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
 import profile_icon from "../image/profile_icon.png";
 import locicon from "../image/lock_icon.svg";
 import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
+import { toast } from "react-toastify";
+
 
 const Login = () => {
   const [state, setState] = useState("Login");
-  const { 
-    setShowLogin, 
-    backendUrl, 
-    setToken, 
-    setUser, 
-    loadCreditsData 
+  const {
+    setShowLogin,
+    backendUrl,
+    setToken,
+    setUser,
+    loadCreditsData
   } = useContext(AppContext);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const onSubmitHandler = async (e) => {
     e.preventDefault();
 
@@ -28,12 +29,9 @@ const Login = () => {
       // No extra spaces!
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
-
       // Trim and clean the full URL
       const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
-
       const { data } = await axios.post(fullUrl, payload);
-
       if (data.success) {
         setToken(data.token); // Save token
         setUser(data.user); // Set user info
