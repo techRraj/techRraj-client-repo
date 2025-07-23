@@ -31,6 +31,7 @@ const Navbar = () => {
             <img src={star_icon} alt="Star Icon" className="nav-img" />
             <p className='nav-p'>
               {credit >= 0 ? `Credits left: ${credit}` : 'Loading...'}
+              console.log(credit);
             </p>
           </button>
           <p className='nav-pi'>Hi, {user.name}</p>

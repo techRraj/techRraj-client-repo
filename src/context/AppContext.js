@@ -13,7 +13,7 @@ const AppContextProvider = ({ children }) => {
   const [credit, setCredit] = useState(0);
 
   // ✅ Trim and clean backend URL (remove trailing slashes/spaces)
-  const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "") || "";
+  const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, ""); 
 
   const navigate = useNavigate();
 
