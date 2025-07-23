@@ -1,4 +1,3 @@
-// src/components/Login.jsx
 import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
@@ -8,34 +7,31 @@ import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
 import { toast } from "react-toastify";
 
-
 const Login = () => {
   const [state, setState] = useState("Login");
-  const {
-    setShowLogin,
-    backendUrl,
-    setToken,
-    setUser,
-    loadCreditsData
-  } = useContext(AppContext);
-
+  const { setShowLogin, backendUrl, setToken, setUser, loadCreditsData } = useContext(AppContext);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const onSubmitHandler = async (e) => {
     e.preventDefault();
 
     try {
-      // No extra spaces!
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
-      // Trim and clean the full URL
+
+      // ✅ Construct URL correctly
       const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
+
+      console.log("Sending request to:", fullUrl); // Debug
+
       const { data } = await axios.post(fullUrl, payload);
+
       if (data.success) {
-        setToken(data.token); // Save token
-        setUser(data.user); // Set user info
-        await loadCreditsData(); // Force reload credit from server (most reliable)
+        setToken(data.token);
+        setUser(data.user);
+        await loadCreditsData(); // Sync credit from server
         setShowLogin(false);
         toast.success("Login successful!");
       } else {
@@ -47,9 +43,11 @@ const Login = () => {
 
       if (error.response) {
         if (error.response.status === 404) {
-          errorMsg = "Server endpoint not found. Check backend URL.";
+          errorMsg = "API endpoint not found. Check backend URL.";
         } else if (error.response.status === 400) {
           errorMsg = error.response.data.message || "Invalid credentials";
+        } else if (error.response.status === 405) {
+          errorMsg = "Method not allowed. Check backend routes.";
         }
       }
 
@@ -107,16 +105,12 @@ const Login = () => {
         {state === "Login" ? (
           <p className="login-reg">
             Don’t have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Sign Up")}>
-              Sign up
-            </span>
+            <span onClick={() => setState("Sign Up")}>Sign up</span>
           </p>
         ) : (
           <p className="login-already">
             Already have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Login")}>
-              Login
-            </span>
+            <span onClick={() => setState("Login")}>Login</span>
           </p>
         )}
 
