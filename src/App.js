@@ -11,7 +11,6 @@ import NotFound from "./page/NotFound";
 import { ToastContainer } from 'react-toastify';
 import Login from "./component/Login";
 import './App.css';
-import 'bootstrap/dist/css/bootstrap.min.css'; // ✅ Add Bootstrap CSS
 
 const App = () => {
   return (
