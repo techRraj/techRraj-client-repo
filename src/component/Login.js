@@ -15,44 +15,45 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const onSubmitHandler = async (e) => {
-    e.preventDefault();
+ const onSubmitHandler = async (e) => {
+  e.preventDefault();
 
-    try {
-      const url = state === "Login" ? "/api/user/login" : "/api/user/register";
-      const payload = state === "Login" ? { email, password } : { name, email, password };
+  try {
+    const url = state === "Login" ? "/api/user/login" : "/api/user/register";
+    const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      // ✅ Use backendUrl from context to point to live backend
-      const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
-      console.log("Sending request to:", fullUrl); // Debugging
+    // ✅ Construct URL correctly
+    const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
+    console.log("Sending request to:", fullUrl); // Debug
 
-      const { data } = await axios.post(fullUrl, payload);
+    const { data } = await axios.post(fullUrl, payload);
 
-      if (data.success) {
-        setToken(data.token);
-        setUser(data.user);
-        await loadCreditsData(); // ✅ Load credits after login
-        localStorage.setItem("token", data.token);
-        setShowLogin(false);
-        toast.success("Success!");
-      } else {
-        toast.error(data.message || "Something went wrong");
-      }
-    } catch (error) {
-      console.error("Auth error:", error);
-      let errorMessage = "Network error. Try again.";
-
-      if (error.response) {
-        errorMessage = error.response.data.message || error.response.statusText;
-      } else if (error.request) {
-        errorMessage = "Request failed. Please check your internet connection.";
-      } else {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage);
+    if (data.success) {
+      setToken(data.token);
+      setUser(data.user);
+      await loadCreditsData(); // Sync credit from server
+      setShowLogin(false);
+      toast.success("Login successful!");
+    } else {
+      alert(data.message || "Something went wrong");
     }
-  };
+  } catch (error) {
+    console.error("Auth error:", error);
+    let errorMsg = "Network error. Try again.";
+
+    if (error.response) {
+      if (error.response.status === 404) {
+        errorMsg = "API endpoint not found. Check backend URL.";
+      } else if (error.response.status === 400) {
+        errorMsg = error.response.data.message || "Invalid credentials";
+      } else if (error.response.status === 405) {
+        errorMsg = "Method not allowed. Check backend routes.";
+      }
+    }
+
+    alert(errorMsg);
+  }
+};
 
   return (
     <div className="login-container">
