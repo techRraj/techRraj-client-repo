@@ -1,24 +1,23 @@
 // src/context/AppContext.js
-import React, { createContext, useEffect, useState, useCallback } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-// Create the context
 export const AppContext = createContext();
 
-// Provider component
-export const AppContextProvider = ({ children }) => {
+const AppContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // ✅ Trim and clean backend URL
+  // ✅ Remove trailing slash and trim whitespace from backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
+
   const navigate = useNavigate();
 
-  // Persist token
+  // Persist token to localStorage
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -27,23 +26,27 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Load credits
   const loadCreditsData = useCallback(async (signal) => {
-    if (!token) return;
+    if (!token) return; // Don't try if no token
 
     try {
+      console.log("Fetching credits...");
       const response = await axios.get("/api/user/credits", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` }, // ✅ Use Bearer token
         signal,
       });
-
+      console.log("Credits fetched:", response.data);
       if (response.data.success) {
+        console.log("Updating credit state:", response.data.credits);
         setCredit(response.data.credits);
         setUser(response.data.user);
       }
     } catch (error) {
-      if (axios.isCancel(error)) return;
-
+      if (axios.isCancel(error)) {
+        console.log("Request canceled:", error.message);
+        return;
+      }
+      console.error("Error loading credits:", error);
       if (error.response?.status === 401) {
         setToken("");
         setUser(null);
@@ -62,17 +65,15 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [token, loadCreditsData]);
 
-  // Generate image
   const generateImage = async (prompt) => {
     try {
       const response = await axios.post(
         "/api/image/generate-image",
         { prompt },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Bearer token
       );
-
       if (response.data.success) {
-        loadCreditsData();
+        loadCreditsData(); // Reload credit balance
         return response.data.resultImage;
       } else {
         toast.error(response.data.message || "Failed to generate image");
@@ -86,15 +87,13 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Logout
   const logout = () => {
     setToken("");
     setUser(null);
-    setCredit(0);
-    toast.info("Logged out successfully");
+    setCredit(0); // Reset credit on logout
+    toast.info("You have been logged out.");
   };
 
-  // Value to provide
   const value = {
     user,
     setUser,
@@ -112,3 +111,5 @@ export const AppContextProvider = ({ children }) => {
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
+
+export default AppContextProvider;

@@ -1,3 +1,4 @@
+// src/components/Login.jsx
 import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
@@ -5,7 +6,7 @@ import profile_icon from "../image/profile_icon.png";
 import locicon from "../image/lock_icon.svg";
 import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
-import { toast } from "react-toastify";
+import { toast } from "react-toastify"; // ✅ Import toast
 
 const Login = () => {
   const [state, setState] = useState("Login");
@@ -18,40 +19,48 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      const url = state === "Login" ? "/api/user/login" : "/api/user/register";
+      // Determine endpoint and payload
+      const urlEndpoint = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      // ✅ Construct URL correctly
-      const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
+      // Construct full URL correctly, ensuring no double slashes or spaces
+      const fullUrl = `${backendUrl}${urlEndpoint}`.replace(/([^:]\/)\/+/g, "$1"); // Normalize slashes
 
-      console.log("Sending request to:", fullUrl); // Debug
+      console.log("Sending request to:", fullUrl); // Debugging
 
       const { data } = await axios.post(fullUrl, payload);
 
       if (data.success) {
         setToken(data.token);
         setUser(data.user);
-        await loadCreditsData(); // Sync credit from server
+        // ✅ Load credits after setting token/user
+        await loadCreditsData(); 
         setShowLogin(false);
-        toast.success("Login successful!");
+        toast.success(state === "Login" ? "Login successful!" : "Account created!");
       } else {
-        alert(data.message || "Something went wrong");
+        toast.error(data.message || "Something went wrong");
       }
     } catch (error) {
-      console.error("Auth error:", error);
-      let errorMsg = "Network error. Try again.";
+      console.error("Auth error:", error); // More descriptive logging
+      let errorMessage = "Network error. Try again.";
 
       if (error.response) {
+        // Server responded with a status code outside 2xx
+        errorMessage = error.response.data.message || error.response.statusText;
         if (error.response.status === 404) {
-          errorMsg = "API endpoint not found. Check backend URL.";
-        } else if (error.response.status === 400) {
-          errorMsg = error.response.data.message || "Invalid credentials";
+            errorMessage = "API endpoint not found. Check backend URL.";
         } else if (error.response.status === 405) {
-          errorMsg = "Method not allowed. Check backend routes.";
+            errorMessage = "Method not allowed. Check backend routes.";
         }
+      } else if (error.request) {
+        // No response was received
+        errorMessage = "No response from server. Check your connection and backend.";
+      } else {
+        // Something happened in setting up the request
+        errorMessage = error.message;
       }
 
-      alert(errorMsg);
+      toast.error(errorMessage);
     }
   };
 
@@ -105,12 +114,16 @@ const Login = () => {
         {state === "Login" ? (
           <p className="login-reg">
             Don’t have an account?{" "}
-            <span onClick={() => setState("Sign Up")}>Sign up</span>
+            <span className="login-yellow" onClick={() => setState("Sign Up")}>
+              Sign up
+            </span>
           </p>
         ) : (
           <p className="login-already">
             Already have an account?{" "}
-            <span onClick={() => setState("Login")}>Login</span>
+            <span className="login-yellow" onClick={() => setState("Login")}>
+              Login
+            </span>
           </p>
         )}
 
