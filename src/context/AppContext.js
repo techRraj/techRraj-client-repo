@@ -4,19 +4,15 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-// Create the context
 export const AppContext = createContext();
 
-// Provider component
 export const AppContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // ✅ Trim and clean backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
-
   const navigate = useNavigate();
 
   // Persist token
@@ -28,7 +24,6 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Load credits
   const loadCreditsData = useCallback(async (signal) => {
     if (!token) return;
 
@@ -48,7 +43,6 @@ export const AppContextProvider = ({ children }) => {
       if (error.response?.status === 401) {
         setToken("");
         setUser(null);
-        setCredit(0);
         toast.error("Session expired. Please log in again.");
       } else {
         toast.error("Failed to load user data.");
@@ -64,7 +58,6 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [token, loadCreditsData]);
 
-  // Generate image
   const generateImage = async (prompt) => {
     try {
       const response = await axios.post(
@@ -88,15 +81,12 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Logout
   const logout = () => {
     setToken("");
     setUser(null);
     setCredit(0);
-    toast.info("Logged out successfully");
   };
 
-  // Value to provide
   const value = {
     user,
     setUser,

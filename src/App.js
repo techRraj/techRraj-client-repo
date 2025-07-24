@@ -1,8 +1,7 @@
-// ./App.js
-
+// src/App.js
 import React, { useContext } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import AppContextProvider, {  AppContext } from "./context/AppContext";
+import { AppContext, AppContextProvider } from "./context/AppContext";
 import Navbar from "./component/Navbar";
 import Home from "./page/Home";
 import Result from "./page/Result";
@@ -12,16 +11,14 @@ import NotFound from "./page/NotFound";
 import { ToastContainer } from 'react-toastify';
 import Login from "./component/Login";
 import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-// ✅ Wrap everything with <Router> here
 const App = () => {
   return (
     <Router>
-   
-       <AppContextProvider>
-        <AppContent/>
-       </AppContextProvider>
-      
+      <AppContextProvider>
+        <AppContent />
+      </AppContextProvider>
     </Router>
   );
 };
