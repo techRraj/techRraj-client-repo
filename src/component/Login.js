@@ -21,10 +21,10 @@ const Login = () => {
       const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      // ✅ Construct URL correctly
+      // ✅ Clean the URL: Remove spaces and extra slashes
       const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
 
-      console.log("Sending request to:", fullUrl); // Debug
+      console.log("Sending request to:", fullUrl); // Debug log
 
       const { data } = await axios.post(fullUrl, payload);
 
