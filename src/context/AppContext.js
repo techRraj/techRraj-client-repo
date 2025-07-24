@@ -12,7 +12,7 @@ const AppContextProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // ✅ Remove trailing slash and trim whitespace from backend URL
+  // ✅ Trim and clean backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
 
   const navigate = useNavigate();
@@ -27,12 +27,10 @@ const AppContextProvider = ({ children }) => {
   }, [token]);
 
   const loadCreditsData = useCallback(async (signal) => {
-    if (!token) return; // Don't try if no token
-
     try {
       console.log("Fetching credits...");
       const response = await axios.get("/api/user/credits", {
-        headers: { Authorization: `Bearer ${token}` }, // ✅ Use Bearer token
+        headers: { Authorization: `Bearer ${token}` }, // ✅ Use Authorization header
         signal,
       });
       console.log("Credits fetched:", response.data);
@@ -40,13 +38,16 @@ const AppContextProvider = ({ children }) => {
         console.log("Updating credit state:", response.data.credits);
         setCredit(response.data.credits);
         setUser(response.data.user);
+      } else {
+        console.error("Failed to fetch credits:", response.data.message);
+        toast.error(response.data.message || "Failed to load user data.");
       }
     } catch (error) {
+      console.error("Error loading credits:", error);
       if (axios.isCancel(error)) {
         console.log("Request canceled:", error.message);
         return;
       }
-      console.error("Error loading credits:", error);
       if (error.response?.status === 401) {
         setToken("");
         setUser(null);
@@ -70,10 +71,10 @@ const AppContextProvider = ({ children }) => {
       const response = await axios.post(
         "/api/image/generate-image",
         { prompt },
-        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Bearer token
+        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Authorization header
       );
       if (response.data.success) {
-        loadCreditsData(); // Reload credit balance
+        loadCreditsData();
         return response.data.resultImage;
       } else {
         toast.error(response.data.message || "Failed to generate image");
@@ -90,8 +91,6 @@ const AppContextProvider = ({ children }) => {
   const logout = () => {
     setToken("");
     setUser(null);
-    setCredit(0); // Reset credit on logout
-    toast.info("You have been logged out.");
   };
 
   const value = {
@@ -112,4 +111,4 @@ const AppContextProvider = ({ children }) => {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-export default AppContextProvider;
+export { AppContextProvider }; // ✅ Named export

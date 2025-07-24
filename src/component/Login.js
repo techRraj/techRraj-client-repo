@@ -1,4 +1,4 @@
-// src/components/Login.jsx
+// src/component/Login.jsx
 import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
@@ -6,7 +6,7 @@ import profile_icon from "../image/profile_icon.png";
 import locicon from "../image/lock_icon.svg";
 import email_icon from "../image/email_icon.svg";
 import cross_icon from "../image/cross_icon.svg";
-import { toast } from "react-toastify"; // ✅ Import toast
+import { toast } from "react-toastify";
 
 const Login = () => {
   const [state, setState] = useState("Login");
@@ -19,13 +19,11 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      // Determine endpoint and payload
-      const urlEndpoint = state === "Login" ? "/api/user/login" : "/api/user/register";
+      const url = state === "Login" ? "/api/user/login" : "/api/user/register";
       const payload = state === "Login" ? { email, password } : { name, email, password };
 
-      // Construct full URL correctly, ensuring no double slashes or spaces
-      const fullUrl = `${backendUrl}${urlEndpoint}`.replace(/([^:]\/)\/+/g, "$1"); // Normalize slashes
-
+      // ✅ Use backendUrl from context to point to live backend
+      const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
       console.log("Sending request to:", fullUrl); // Debugging
 
       const { data } = await axios.post(fullUrl, payload);
@@ -33,30 +31,22 @@ const Login = () => {
       if (data.success) {
         setToken(data.token);
         setUser(data.user);
-        // ✅ Load credits after setting token/user
-        await loadCreditsData(); 
+        await loadCreditsData(); // ✅ Load credits after login
+        localStorage.setItem("token", data.token);
         setShowLogin(false);
-        toast.success(state === "Login" ? "Login successful!" : "Account created!");
+        toast.success("Success!");
       } else {
         toast.error(data.message || "Something went wrong");
       }
     } catch (error) {
-      console.error("Auth error:", error); // More descriptive logging
+      console.error("Auth error:", error);
       let errorMessage = "Network error. Try again.";
 
       if (error.response) {
-        // Server responded with a status code outside 2xx
         errorMessage = error.response.data.message || error.response.statusText;
-        if (error.response.status === 404) {
-            errorMessage = "API endpoint not found. Check backend URL.";
-        } else if (error.response.status === 405) {
-            errorMessage = "Method not allowed. Check backend routes.";
-        }
       } else if (error.request) {
-        // No response was received
-        errorMessage = "No response from server. Check your connection and backend.";
+        errorMessage = "Request failed. Please check your internet connection.";
       } else {
-        // Something happened in setting up the request
         errorMessage = error.message;
       }
 
