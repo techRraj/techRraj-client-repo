@@ -1,22 +1,25 @@
-// src/context/AppContextProvider.js
-import { createContext, useEffect, useState, useCallback } from "react";
+// src/context/AppContext.js
+import React, { createContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
+// Create the context
 export const AppContext = createContext();
 
-const AppContextProvider = ({ children }) => {
+// Provider component
+export const AppContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // ✅ Trim and clean backend URL (remove trailing slashes/spaces)
-const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
+  // ✅ Trim and clean backend URL
+  const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
+
   const navigate = useNavigate();
 
-  // Persist token to localStorage
+  // Persist token
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -25,44 +28,34 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "")
     }
   }, [token]);
 
-  // Load user credits from server
+  // Load credits
   const loadCreditsData = useCallback(async (signal) => {
     if (!token) return;
 
     try {
-      console.log("Fetching credits from server...");
       const response = await axios.get("/api/user/credits", {
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ Standard JWT header
-        },
+        headers: { Authorization: `Bearer ${token}` },
         signal,
       });
 
       if (response.data.success) {
         setCredit(response.data.credits);
         setUser(response.data.user);
-        console.log("Credit balance updated:", response.data.credits);
-      } else {
-        toast.error(response.data.message || "Failed to load user data");
       }
     } catch (error) {
-      console.error("Error loading credits:", error);
-
       if (axios.isCancel(error)) return;
 
       if (error.response?.status === 401) {
-        // Token expired or invalid
         setToken("");
         setUser(null);
         setCredit(0);
         toast.error("Session expired. Please log in again.");
       } else {
-        toast.error("Network error. Failed to load user data.");
+        toast.error("Failed to load user data.");
       }
     }
   }, [token]);
 
-  // Re-fetch credits when token changes
   useEffect(() => {
     if (token) {
       const controller = new AbortController();
@@ -71,27 +64,17 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "")
     }
   }, [token, loadCreditsData]);
 
-  // Generate image and deduct credit
+  // Generate image
   const generateImage = async (prompt) => {
-    if (!prompt || !token) {
-      toast.error("Prompt and login required");
-      return;
-    }
-
     try {
       const response = await axios.post(
         "/api/image/generate-image",
         { prompt },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.data.success) {
-        toast.success("Image generated!");
-        loadCreditsData(); // Refresh credit balance
+        loadCreditsData();
         return response.data.resultImage;
       } else {
         toast.error(response.data.message || "Failed to generate image");
@@ -105,7 +88,7 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "")
     }
   };
 
-  // Logout handler
+  // Logout
   const logout = () => {
     setToken("");
     setUser(null);
@@ -113,7 +96,7 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "")
     toast.info("Logged out successfully");
   };
 
-  // Context value
+  // Value to provide
   const value = {
     user,
     setUser,
@@ -131,5 +114,3 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "")
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
-
-export default AppContextProvider;
