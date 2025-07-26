@@ -1,4 +1,3 @@
-// src/context/AppContext.js
 import { createContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -12,12 +11,11 @@ const AppContextProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [credit, setCredit] = useState(0);
 
-  // ✅ Trim and clean backend URL
-  const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "");
+  // Properly formatted backend URL
+  const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "") || "";
 
   const navigate = useNavigate();
 
-  // Persist token to localStorage
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -27,88 +25,97 @@ const AppContextProvider = ({ children }) => {
   }, [token]);
 
   const loadCreditsData = useCallback(async (signal) => {
+    if (!token) return;
+    
     try {
-      console.log("Fetching credits...");
-      const response = await axios.get("/api/user/credits", {
-        headers: { Authorization: `Bearer ${token}` }, // ✅ Use Authorization header
+      const fullUrl = `${backendUrl}/api/user/credits`.replace(/([^:]\/)\/+/g, "$1");
+      const response = await axios.get(fullUrl, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         signal,
       });
-      console.log("Credits fetched:", response.data);
+
       if (response.data.success) {
-        console.log("Updating credit state:", response.data.credits);
         setCredit(response.data.credits);
         setUser(response.data.user);
       } else {
-        console.error("Failed to fetch credits:", response.data.message);
         toast.error(response.data.message || "Failed to load user data.");
       }
     } catch (error) {
+      if (axios.isCancel(error)) return;
+      
       console.error("Error loading credits:", error);
-      if (axios.isCancel(error)) {
-        console.log("Request canceled:", error.message);
-        return;
-      }
       if (error.response?.status === 401) {
         setToken("");
         setUser(null);
         toast.error("Session expired. Please log in again.");
-      } else {
-        toast.error("Failed to load user data.");
       }
     }
-  }, [token]);
+  }, [token, backendUrl]);
 
   useEffect(() => {
-    if (token) {
-      const controller = new AbortController();
-      loadCreditsData(controller.signal);
-      return () => controller.abort();
-    }
+    const controller = new AbortController();
+    loadCreditsData(controller.signal);
+    return () => controller.abort();
   }, [token, loadCreditsData]);
 
   const generateImage = async (prompt) => {
     try {
+      const fullUrl = `${backendUrl}/api/image/generate-image`.replace(/([^:]\/)\/+/g, "$1");
       const response = await axios.post(
-        "/api/image/generate-image",
+        fullUrl,
         { prompt },
-        { headers: { Authorization: `Bearer ${token}` } } // ✅ Use Authorization header
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
+
       if (response.data.success) {
-        loadCreditsData();
+        await loadCreditsData();
         return response.data.resultImage;
       } else {
-        toast.error(response.data.message || "Failed to generate image");
-        if (response.data.creditBalance === 0) {
-          navigate("/buy");
-        }
+        throw new Error(response.data.message || "Failed to generate image");
       }
     } catch (error) {
-      toast.error("Error generating image.");
-      console.error("Generate Image Error:", error);
+      toast.error(error.message);
+      if (error.response?.data?.creditBalance === 0) {
+        navigate("/buy");
+      }
+      throw error;
     }
   };
 
   const logout = () => {
     setToken("");
     setUser(null);
+    toast.success("Logged out successfully");
   };
 
-  const value = {
-    user,
-    setUser,
-    showLogin,
-    setShowLogin,
-    backendUrl,
-    token,
-    setToken,
-    credit,
-    setCredit,
-    loadCreditsData,
-    logout,
-    generateImage,
-  };
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider
+      value={{
+        user,
+        setUser,
+        showLogin,
+        setShowLogin,
+        backendUrl,
+        token,
+        setToken,
+        credit,
+        setCredit,
+        loadCreditsData,
+        logout,
+        generateImage,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
 };
 
-export { AppContextProvider }; // ✅ Named export
+export { AppContextProvider };

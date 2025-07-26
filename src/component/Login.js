@@ -1,4 +1,3 @@
-// src/component/Login.jsx
 import React, { useContext, useState } from "react";
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
@@ -14,55 +13,53 @@ const Login = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-const onSubmitHandler = async (e) => {
-  e.preventDefault();
+  const onSubmitHandler = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const url = state === "Login" ? "/api/user/login" : "/api/user/register";
-    const payload = state === "Login" ? { email, password } : { name, email, password };
+    try {
+      const endpoint = state === "Login" ? "/api/user/login" : "/api/user/register";
+      const payload = state === "Login" ? { email, password } : { name, email, password };
 
-    // Debug: Check backend URL
-    console.log("Backend URL from context:", backendUrl);
-    
-    const fullUrl = `${backendUrl}${url}`;
-    console.log("Full API URL:", fullUrl);
+      // Construct the full URL
+      const fullUrl = `${backendUrl}${endpoint}`.replace(/([^:]\/)\/+/g, "$1");
+      console.log("API Request:", fullUrl, payload);
 
-    const { data } = await axios.post(fullUrl, payload, {
-      headers: {
-        'Content-Type': 'application/json'
+      const { data } = await axios.post(fullUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (data.success) {
+        setToken(data.token);
+        setUser(data.user);
+        await loadCreditsData();
+        setShowLogin(false);
+        toast.success(state === "Login" ? "Login successful!" : "Registration successful!");
+      } else {
+        toast.error(data.message || "Operation failed");
       }
-    });
-
-    if (data.success) {
-      setToken(data.token);
-      setUser(data.user);
-      await loadCreditsData();
-      setShowLogin(false);
-      toast.success("Login successful!");
-    } else {
-      toast.error(data.message || "Something went wrong");
-    }
-  } catch (error) {
-    console.error("Auth error:", error);
-    let errorMsg = "Network error. Try again.";
-
-    if (error.response) {
-      console.error("Error response:", error.response);
-      if (error.response.status === 404) {
-        errorMsg = "API endpoint not found. Check backend URL.";
-      } else if (error.response.status === 400) {
-        errorMsg = error.response.data?.message || "Invalid credentials";
-      } else if (error.response.status === 405) {
-        errorMsg = "Method not allowed. Check backend routes.";
+    } catch (error) {
+      console.error("Auth error:", error);
+      
+      let errorMsg = "Network error. Please try again.";
+      if (error.response) {
+        if (error.response.status === 404) {
+          errorMsg = "API endpoint not found. Please contact support.";
+        } else if (error.response.status === 400) {
+          errorMsg = error.response.data?.message || "Invalid credentials";
+        } else if (error.response.status === 405) {
+          errorMsg = "Method not allowed. Please refresh and try again.";
+        }
       }
-    } else if (error.request) {
-      errorMsg = "No response received from server. Check network connection.";
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
-
-    toast.error(errorMsg);
-  }
-};
+  };
 
   return (
     <div className="login-container">
@@ -103,17 +100,21 @@ const onSubmitHandler = async (e) => {
             placeholder="Password"
             autoComplete="current-password"
             required
+            minLength="8"
           />
         </div>
 
-        <p className="login-forget">Forgot password?</p>
-        <button className="login-create" type="submit">
-          {state === "Login" ? "Login" : "Create Account"}
+        <button 
+          className="login-create" 
+          type="submit"
+          disabled={isLoading}
+        >
+          {isLoading ? "Processing..." : (state === "Login" ? "Login" : "Create Account")}
         </button>
 
         {state === "Login" ? (
           <p className="login-reg">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <span className="login-yellow" onClick={() => setState("Sign Up")}>
               Sign up
             </span>
