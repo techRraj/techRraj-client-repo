@@ -15,43 +15,52 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
- const onSubmitHandler = async (e) => {
+const onSubmitHandler = async (e) => {
   e.preventDefault();
 
   try {
     const url = state === "Login" ? "/api/user/login" : "/api/user/register";
     const payload = state === "Login" ? { email, password } : { name, email, password };
 
-    // ✅ Construct URL correctly
-    const fullUrl = `${backendUrl}${url}`.replace(/\s+/g, "").replace(/\/+/g, "/");
-    console.log("Sending request to:", fullUrl); // Debug
+    // Debug: Check backend URL
+    console.log("Backend URL from context:", backendUrl);
+    
+    const fullUrl = `${backendUrl}${url}`;
+    console.log("Full API URL:", fullUrl);
 
-    const { data } = await axios.post(fullUrl, payload);
+    const { data } = await axios.post(fullUrl, payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
 
     if (data.success) {
       setToken(data.token);
       setUser(data.user);
-      await loadCreditsData(); // Sync credit from server
+      await loadCreditsData();
       setShowLogin(false);
       toast.success("Login successful!");
     } else {
-      alert(data.message || "Something went wrong");
+      toast.error(data.message || "Something went wrong");
     }
   } catch (error) {
     console.error("Auth error:", error);
     let errorMsg = "Network error. Try again.";
 
     if (error.response) {
+      console.error("Error response:", error.response);
       if (error.response.status === 404) {
         errorMsg = "API endpoint not found. Check backend URL.";
       } else if (error.response.status === 400) {
-        errorMsg = error.response.data.message || "Invalid credentials";
+        errorMsg = error.response.data?.message || "Invalid credentials";
       } else if (error.response.status === 405) {
         errorMsg = "Method not allowed. Check backend routes.";
       }
+    } else if (error.request) {
+      errorMsg = "No response received from server. Check network connection.";
     }
 
-    alert(errorMsg);
+    toast.error(errorMsg);
   }
 };
 
