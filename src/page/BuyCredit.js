@@ -35,7 +35,7 @@ const BuyCredit = () => {
   const {user, backendUrl, loadCreditsData, token, setShowLogin} = useContext(AppContext)
 const initpay = async(order) => {
     const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      key: import.meta.env.RAZORPAY_KEY_ID,
       amount: order.amount,
       currency: order.currency,
       name: 'Credits Payment',
