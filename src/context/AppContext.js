@@ -25,35 +25,39 @@ const AppContextProvider = ({ children }) => {
   }, [token]);
 
   const loadCreditsData = useCallback(async (signal) => {
-    if (!token) return;
-    
-    try {
-      const fullUrl = `${backendUrl}/api/user/credits`.replace(/([^:]\/)\/+/g, "$1");
-      const response = await axios.get(fullUrl, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        signal,
-      });
+  if (!token) return;
+  
+  try {
+    const response = await axios.get(`${backendUrl}/api/user/credits`, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      signal,
+    });
 
-      if (response.data.success) {
-        setCredit(response.data.credits);
+    if (response.data.success) {
+      setCredit(response.data.credits);
+      // Make sure we're updating user data if it's returned
+      if (response.data.user) {
         setUser(response.data.user);
-      } else {
-        toast.error(response.data.message || "Failed to load user data.");
       }
-    } catch (error) {
-      if (axios.isCancel(error)) return;
-      
-      console.error("Error loading credits:", error);
-      if (error.response?.status === 401) {
-        setToken("");
-        setUser(null);
-        toast.error("Session expired. Please log in again.");
-      }
+    } else {
+      throw new Error(response.data.message || "Failed to load user data");
     }
-  }, [token, backendUrl]);
+  } catch (error) {
+    if (axios.isCancel(error)) return;
+    
+    console.error("Error loading credits:", error);
+    if (error.response?.status === 401) {
+      // Clear invalid token
+      setToken("");
+      setUser(null);
+      localStorage.removeItem("token");
+      toast.error("Session expired. Please log in again.");
+    }
+  }
+}, [token, backendUrl]);
 
   useEffect(() => {
     const controller = new AbortController();

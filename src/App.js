@@ -11,14 +11,20 @@ import NotFound from "./page/NotFound";
 import { ToastContainer } from 'react-toastify';
 import Login from "./component/Login";
 import './App.css';
+import "./page/ErrorBoundary";
+import ErrorBoundary from "./page/ErrorBoundary";
 
 const App = () => {
   return (
-    <Router>
-      <AppContextProvider>
-        <AppContent />
-      </AppContextProvider>
-    </Router>
+  <Router>
+  <AppContextProvider>
+   <ErrorBoundary>
+ <AppContent />
+   </ErrorBoundary>
+     
+   
+  </AppContextProvider>
+</Router>
   );
 };
 

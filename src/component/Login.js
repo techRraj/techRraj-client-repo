@@ -1,139 +1,228 @@
-import React, { useContext, useState } from "react";
-import axios from "axios";
-import { AppContext } from "../context/AppContext";
-import profile_icon from "../image/profile_icon.png";
-import locicon from "../image/lock_icon.svg";
-import email_icon from "../image/email_icon.svg";
-import cross_icon from "../image/cross_icon.svg";
-import { toast } from "react-toastify";
+import React, { useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import { AppContext } from '../context/AppContext';
+import { toast } from 'react-toastify';
+import '../App.css';
+import { FiMail, FiLock, FiUser, FiX, FiEye, FiEyeOff } from 'react-icons/fi';
 
 const Login = () => {
-  const [state, setState] = useState("Login");
-  const { setShowLogin, backendUrl, setToken, setUser, loadCreditsData } = useContext(AppContext);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [state, setState] = useState('login');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
+  const [errors, setErrors] = useState({});
+  const [passwordStrength, setPasswordStrength] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);
 
-  const onSubmitHandler = async (e) => {
+  const calculatePasswordStrength = (password) => {
+    let strength = 0;
+    if (password.length > 0) strength++;
+    if (password.length >= 8) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    return Math.min(strength, 4);
+  };
+
+  useEffect(() => {
+    setPasswordStrength(calculatePasswordStrength(formData.password));
+  }, [formData.password]);
+
+  const getStrengthColor = () => {
+    const colors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71'];
+    return colors[passwordStrength - 1] || '#ecf0f1';
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+    
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+    
+    if (state === 'register' && !formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+    
     setIsLoading(true);
-
+    
     try {
-      const endpoint = state === "Login" ? "/api/user/login" : "/api/user/register";
-      const payload = state === "Login" ? { email, password } : { name, email, password };
-
-      // Construct the full URL
-      const fullUrl = `${backendUrl}${endpoint}`.replace(/([^:]\/)\/+/g, "$1");
-      console.log("API Request:", fullUrl, payload);
-
-      const { data } = await axios.post(fullUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
+      const endpoint = state === 'login' ? '/api/user/login' : '/api/user/register';
+      const payload = state === 'login' 
+        ? { email: formData.email, password: formData.password }
+        : formData;
+      
+      const { data } = await axios.post(`${backendUrl}${endpoint}`, payload);
+      
       if (data.success) {
+        setFormData({ name: '', email: '', password: '' });
+        setErrors({});
         setToken(data.token);
         setUser(data.user);
-        await loadCreditsData();
         setShowLogin(false);
-        toast.success(state === "Login" ? "Login successful!" : "Registration successful!");
-      } else {
-        toast.error(data.message || "Operation failed");
+        toast.success(
+          state === 'login' 
+            ? 'Login successful!' 
+            : 'Registration successful! Please check your email to verify your account.'
+        );
       }
     } catch (error) {
-      console.error("Auth error:", error);
-      
-      let errorMsg = "Network error. Please try again.";
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMsg = "API endpoint not found. Please contact support.";
-        } else if (error.response.status === 400) {
-          errorMsg = error.response.data?.message || "Invalid credentials";
-        } else if (error.response.status === 405) {
-          errorMsg = "Method not allowed. Please refresh and try again.";
-        }
-      }
-      toast.error(errorMsg);
+      toast.error(
+        error.response?.data?.message || 
+        'Authentication failed. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="login-container">
-      <form onSubmit={onSubmitHandler} className="login-form">
-        <h1 className="login-lg">{state}</h1>
-        <p className="login-txt">Welcome back! Please sign in to continue</p>
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
 
-        {state !== "Login" && (
-          <div className="login-name">
-            <img src={profile_icon} alt="Profile" width={20} />
+  return (
+    <div className="auth-container">
+      <FiX 
+        className="close-button" 
+        size={24} 
+        onClick={() => setShowLogin(false)} 
+      />
+      
+      <h1 className="auth-title">
+        {state === 'login' ? 'Login' : 'Create Account'}
+      </h1>
+      
+      <p className="auth-subtitle">
+        {state === 'login' 
+          ? 'Welcome back! Please sign in to continue' 
+          : 'Create an account to get started'}
+      </p>
+      
+      <form 
+        className="auth-form" 
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
+      >
+        {state === 'register' && (
+          <div className={`input-group ${errors.name ? 'error-input' : ''}`}>
+            <FiUser size={20} />
             <input
-              onChange={(e) => setName(e.target.value)}
-              value={name}
               type="text"
+              name="name"
               placeholder="Full Name"
-              required
+              value={formData.name}
+              onChange={handleChange}
+              autoComplete="name"
             />
           </div>
         )}
-
-        <div className="login-email">
-          <img src={email_icon} alt="Email" />
+        
+        <div className={`input-group ${errors.email ? 'error-input' : ''}`}>
+          <FiMail size={20} />
           <input
-            onChange={(e) => setEmail(e.target.value)}
-            value={email}
             type="email"
-            placeholder="Email Id"
-            required
+            name="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            autoComplete="username"
           />
         </div>
-
-        <div className="login-psw">
-          <img src={locicon} alt="Lock" />
+        {errors.email && <span className="error-text">{errors.email}</span>}
+        
+        <div className={`input-group ${errors.password ? 'error-input' : ''}`}>
+          <FiLock size={20} />
           <input
-            onChange={(e) => setPassword(e.target.value)}
-            value={password}
-            type="password"
+            type={showPassword ? 'text' : 'password'}
+            name="password"
             placeholder="Password"
-            autoComplete="current-password"
-            required
-            minLength="8"
+            value={formData.password}
+            onChange={handleChange}
+            autoComplete={state === 'login' ? 'current-password' : 'new-password'}
           />
+          {showPassword ? (
+            <FiEyeOff 
+              size={20} 
+              onClick={() => setShowPassword(false)}
+              style={{ cursor: 'pointer', opacity: 0.7 }}
+            />
+          ) : (
+            <FiEye 
+              size={20} 
+              onClick={() => setShowPassword(true)}
+              style={{ cursor: 'pointer', opacity: 0.7 }}
+            />
+          )}
         </div>
-
+        {errors.password && <span className="error-text">{errors.password}</span>}
+        
+        {state === 'register' && formData.password && (
+          <div>
+            <div className="password-strength">
+              <div 
+                className="strength-bar"
+                style={{
+                  width: `${(passwordStrength / 4) * 100}%`,
+                  backgroundColor: getStrengthColor()
+                }}
+              />
+            </div>
+            <div className="strength-text">
+              {passwordStrength === 0 && 'Very Weak'}
+              {passwordStrength === 1 && 'Weak'}
+              {passwordStrength === 2 && 'Medium'}
+              {passwordStrength === 3 && 'Strong'}
+              {passwordStrength === 4 && 'Very Strong'}
+            </div>
+          </div>
+        )}
+        
         <button 
-          className="login-create" 
-          type="submit"
+          type="submit" 
+          className="auth-button"
           disabled={isLoading}
         >
-          {isLoading ? "Processing..." : (state === "Login" ? "Login" : "Create Account")}
+          {isLoading ? (
+            <div className="spinner"></div>
+          ) : (
+            state === 'login' ? 'Login' : 'Create Account'
+          )}
         </button>
-
-        {state === "Login" ? (
-          <p className="login-reg">
-            Don't have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Sign Up")}>
-              Sign up
-            </span>
-          </p>
-        ) : (
-          <p className="login-already">
-            Already have an account?{" "}
-            <span className="login-yellow" onClick={() => setState("Login")}>
-              Login
-            </span>
-          </p>
-        )}
-
-        <img
-          onClick={() => setShowLogin(false)}
-          src={cross_icon}
-          alt="Close"
-          className="login-cancel"
-        />
+        
+        <p className="auth-link">
+          {state === 'login' ? (
+            <>Don't have an account?{' '}
+              <span onClick={() => setState('register')}>Sign up</span>
+            </>
+          ) : (
+            <>Already have an account?{' '}
+              <span onClick={() => setState('login')}>Login</span>
+            </>
+          )}
+        </p>
       </form>
     </div>
   );
