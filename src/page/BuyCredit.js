@@ -65,26 +65,36 @@ const BuyCredit = () => {
     rzp.open();
   };
 
-  const paymentRazorpay = async (planId) => {
-    try {
-      if (!user) {
-        setShowLogin(true);
-        return;
-      }
-
-      const { data } = await axios.post(
-        `${backendUrl}/api/user/create-order`,
-        { planId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (data.success) {
-        initpay(data.order);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+const paymentRazorpay = async (planId) => {
+  try {
+    if (!user) {
+      setShowLogin(true);
+      return;
     }
-  };
+
+    const { data } = await axios.post(
+      `${backendUrl}/api/user/create-order`,
+      { planId },
+      { 
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (data.success) {
+      initpay(data.order);
+    } else {
+      toast.error(data.message || "Failed to create order");
+    }
+  } catch (error) {
+    console.error("Payment Error:", error);
+    toast.error(error.response?.data?.message || 
+               error.message || 
+               "Failed to initiate payment");
+  }
+};
 
   return (
     <motion.div
