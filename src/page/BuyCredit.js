@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -31,10 +31,32 @@ const BuyCredit = () => {
   const navigate = useNavigate();
   const { user, backendUrl, loadCreditsData, token, setShowLogin } = useContext(AppContext);
   const [loading, setLoading] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  // Check if Razorpay is loaded
+  useEffect(() => {
+    if (window.Razorpay) {
+      setRazorpayLoaded(true);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => setRazorpayLoaded(true);
+    script.onerror = () => {
+      console.error('Failed to load Razorpay script');
+      toast.error('Failed to load payment gateway. Please refresh the page.');
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const initpay = async (order) => {
-    // Check if Razorpay is loaded
-    if (!window.Razorpay) {
+    if (!razorpayLoaded) {
       toast.error("Payment gateway is still loading. Please try again in a moment.");
       return;
     }
@@ -44,7 +66,7 @@ const BuyCredit = () => {
       amount: order.amount,
       currency: order.currency || "INR",
       name: 'Credits Payment',
-      description: 'Credits Payment',
+      description: `Purchase of ${order.notes?.credits || 'credits'}`,
       order_id: order.id,
       image: '/assets/logo_icon.svg',
       handler: async (response) => {
@@ -52,15 +74,21 @@ const BuyCredit = () => {
           const { data } = await axios.post(
             `${backendUrl}/api/user/verify-payment`, 
             response, 
-            { headers: { Authorization: `Bearer ${token}` } }
+            { 
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
           );
           if (data.success) {
             await loadCreditsData();
-            navigate('/');
             toast.success('Credits Added Successfully');
+            navigate('/');
           }
         } catch (error) {
-          toast.error(error.response?.data?.message || error.message);
+          console.error('Payment verification error:', error);
+          toast.error(error.response?.data?.message || 'Payment verification failed');
         }
       },
       prefill: {
@@ -72,7 +100,7 @@ const BuyCredit = () => {
       },
       modal: {
         ondismiss: () => {
-          toast.info('Payment window closed');
+          toast.info('Payment cancelled');
         }
       }
     };
@@ -89,8 +117,14 @@ const BuyCredit = () => {
   const paymentRazorpay = async (planId) => {
     try {
       setLoading(true);
+      
       if (!user) {
         setShowLogin(true);
+        return;
+      }
+
+      if (!token) {
+        toast.error('Please login again');
         return;
       }
 
@@ -112,9 +146,14 @@ const BuyCredit = () => {
       }
     } catch (error) {
       console.error("Payment Error:", error);
-      toast.error(error.response?.data?.message || 
-                 error.message || 
-                 "Failed to initiate payment");
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        // Handle logout or token refresh here if needed
+      } else {
+        toast.error(error.response?.data?.message || 
+                   error.message || 
+                   "Failed to initiate payment");
+      }
     } finally {
       setLoading(false);
     }
@@ -141,14 +180,14 @@ const BuyCredit = () => {
             <p>{item.credits} credits</p>
             <button 
               onClick={() => paymentRazorpay(item.id)}
-              disabled={loading}
+              disabled={loading || !razorpayLoaded}
               style={{
                 padding: '10px 20px',
-                backgroundColor: loading ? '#cccccc' : '#3399cc',
+                backgroundColor: (loading || !razorpayLoaded) ? '#cccccc' : '#3399cc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer'
+                cursor: (loading || !razorpayLoaded) ? 'not-allowed' : 'pointer'
               }}
             >
               {loading ? 'Processing...' : 'Purchase'}
