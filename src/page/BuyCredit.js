@@ -29,11 +29,11 @@ const plans = [
 
 const BuyCredit = () => {
   const navigate = useNavigate();
-  const { user, backendUrl, loadCreditsData, token, setShowLogin } = useContext(AppContext);
+  const { user, backendUrl, loadCreditsData, token, setShowLogin, logout } = useContext(AppContext);
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
-  // Check if Razorpay is loaded
+  // Load Razorpay script
   useEffect(() => {
     if (window.Razorpay) {
       setRazorpayLoaded(true);
@@ -45,7 +45,6 @@ const BuyCredit = () => {
     script.async = true;
     script.onload = () => setRazorpayLoaded(true);
     script.onerror = () => {
-      console.error('Failed to load Razorpay script');
       toast.error('Failed to load payment gateway. Please refresh the page.');
     };
     document.body.appendChild(script);
@@ -55,66 +54,68 @@ const BuyCredit = () => {
     };
   }, []);
 
-  const initpay = async (order) => {
+  const initPayment = async (order) => {
     if (!razorpayLoaded) {
-      toast.error("Payment gateway is still loading. Please try again in a moment.");
+      toast.error("Payment gateway is loading. Please wait...");
       return;
     }
 
-    const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: order.amount,
-      currency: order.currency || "INR",
-      name: 'Credits Payment',
-      description: `Purchase of ${order.notes?.credits || 'credits'}`,
-      order_id: order.id,
-      image: '/assets/logo_icon.svg',
-      handler: async (response) => {
-        try {
-          const { data } = await axios.post(
-            `${backendUrl}/api/user/verify-payment`, 
-            response, 
-            { 
-              headers: { 
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          if (data.success) {
-            await loadCreditsData();
-            toast.success('Credits Added Successfully');
-            navigate('/');
-          }
-        } catch (error) {
-          console.error('Payment verification error:', error);
-          toast.error(error.response?.data?.message || 'Payment verification failed');
-        }
-      },
-      prefill: {
-        name: user?.name || '',
-        email: user?.email || '',
-      },
-      theme: {
-        color: '#3399cc'
-      },
-      modal: {
-        ondismiss: () => {
-          toast.info('Payment cancelled');
-        }
-      }
-    };
-
     try {
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency || "INR",
+        name: 'Your App Name',
+        description: `Purchase of ${order.notes?.credits || 'credits'}`,
+        order_id: order.id,
+        image: '/logo.png',
+        handler: async (response) => {
+          try {
+            const verificationResponse = await axios.post(
+              `${backendUrl}/api/user/verify-payment`,
+              response,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (verificationResponse.data.success) {
+              await loadCreditsData();
+              toast.success('Payment successful! Credits added to your account');
+              navigate('/');
+            }
+          } catch (verificationError) {
+            console.error('Payment verification failed:', verificationError);
+            toast.error(verificationError.response?.data?.message || 'Payment verification failed');
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
+        },
+        theme: {
+          color: '#3399cc'
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info('Payment window closed');
+          }
+        }
+      };
+
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (error) {
-      console.error("Razorpay initialization error:", error);
-      toast.error("Failed to initialize payment gateway");
+      console.error('Razorpay initialization error:', error);
+      toast.error('Failed to initialize payment gateway');
     }
   };
 
-  const paymentRazorpay = async (planId) => {
+  const handlePayment = async (planId) => {
     try {
       setLoading(true);
       
@@ -124,35 +125,56 @@ const BuyCredit = () => {
       }
 
       if (!token) {
-        toast.error('Please login again');
+        toast.error('Your session has expired. Please login again.');
+        logout();
         return;
       }
 
-      const { data } = await axios.post(
+      // Debug: Log the request details
+      console.log('Creating order with:', {
+        url: `${backendUrl}/api/user/create-order`,
+        planId,
+        token: token.substring(0, 10) + '...' // Don't log full token
+      });
+
+      const response = await axios.post(
         `${backendUrl}/api/user/create-order`,
         { planId },
-        { 
-          headers: { 
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 10000 // 10 seconds timeout
         }
       );
 
-      if (data.success) {
-        await initpay(data.order);
+      if (response.data.success) {
+        await initPayment(response.data.order);
       } else {
-        toast.error(data.message || "Failed to create order");
+        toast.error(response.data.message || "Failed to create order");
       }
     } catch (error) {
-      console.error("Payment Error:", error);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-        // Handle logout or token refresh here if needed
+      console.error('Payment Error:', {
+        message: error.message,
+        response: error.response?.data,
+        config: error.config
+      });
+
+      if (error.response) {
+        // Handle specific error statuses
+        if (error.response.status === 401) {
+          toast.error('Session expired. Please login again.');
+          logout();
+        } else if (error.response.status === 500) {
+          toast.error('Server error. Please try again later.');
+        } else {
+          toast.error(error.response.data?.message || 'Payment failed');
+        }
+      } else if (error.request) {
+        toast.error('No response from server. Check your connection.');
       } else {
-        toast.error(error.response?.data?.message || 
-                   error.message || 
-                   "Failed to initiate payment");
+        toast.error('Payment setup failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -179,7 +201,7 @@ const BuyCredit = () => {
             <p>₹{item.price.toLocaleString()}</p>
             <p>{item.credits} credits</p>
             <button 
-              onClick={() => paymentRazorpay(item.id)}
+              onClick={() => handlePayment(item.id)}
               disabled={loading || !razorpayLoaded}
               style={{
                 padding: '10px 20px',
