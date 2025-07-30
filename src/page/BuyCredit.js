@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -6,7 +6,6 @@ import axios from 'axios';
 import { useContext } from 'react';
 import { AppContext } from '../context/AppContext';
 
-// Match these plans with your backend
 const plans = [
   {
     id: 'basic',
@@ -31,16 +30,23 @@ const plans = [
 const BuyCredit = () => {
   const navigate = useNavigate();
   const { user, backendUrl, loadCreditsData, token, setShowLogin } = useContext(AppContext);
+  const [loading, setLoading] = useState(false);
 
   const initpay = async (order) => {
+    // Check if Razorpay is loaded
+    if (!window.Razorpay) {
+      toast.error("Payment gateway is still loading. Please try again in a moment.");
+      return;
+    }
+
     const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID, // Updated to use process.env
+      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: order.amount,
-      currency: order.currency,
+      currency: order.currency || "INR",
       name: 'Credits Payment',
       description: 'Credits Payment',
       order_id: order.id,
-      receipt: order.receipt,
+      image: '/assets/logo_icon.svg',
       handler: async (response) => {
         try {
           const { data } = await axios.post(
@@ -57,44 +63,62 @@ const BuyCredit = () => {
           toast.error(error.response?.data?.message || error.message);
         }
       },
+      prefill: {
+        name: user?.name || '',
+        email: user?.email || '',
+      },
       theme: {
         color: '#3399cc'
-      }
-    };
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  };
-
-const paymentRazorpay = async (planId) => {
-  try {
-    if (!user) {
-      setShowLogin(true);
-      return;
-    }
-
-    const { data } = await axios.post(
-      `${backendUrl}/api/user/create-order`,
-      { planId },
-      { 
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      },
+      modal: {
+        ondismiss: () => {
+          toast.info('Payment window closed');
         }
       }
-    );
+    };
 
-    if (data.success) {
-      initpay(data.order);
-    } else {
-      toast.error(data.message || "Failed to create order");
+    try {
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      console.error("Razorpay initialization error:", error);
+      toast.error("Failed to initialize payment gateway");
     }
-  } catch (error) {
-    console.error("Payment Error:", error);
-    toast.error(error.response?.data?.message || 
-               error.message || 
-               "Failed to initiate payment");
-  }
-};
+  };
+
+  const paymentRazorpay = async (planId) => {
+    try {
+      setLoading(true);
+      if (!user) {
+        setShowLogin(true);
+        return;
+      }
+
+      const { data } = await axios.post(
+        `${backendUrl}/api/user/create-order`,
+        { planId },
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (data.success) {
+        await initpay(data.order);
+      } else {
+        toast.error(data.message || "Failed to create order");
+      }
+    } catch (error) {
+      console.error("Payment Error:", error);
+      toast.error(error.response?.data?.message || 
+                 error.message || 
+                 "Failed to initiate payment");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -117,16 +141,17 @@ const paymentRazorpay = async (planId) => {
             <p>{item.credits} credits</p>
             <button 
               onClick={() => paymentRazorpay(item.id)}
+              disabled={loading}
               style={{
                 padding: '10px 20px',
-                backgroundColor: '#3399cc',
+                backgroundColor: loading ? '#cccccc' : '#3399cc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: 'pointer'
+                cursor: loading ? 'not-allowed' : 'pointer'
               }}
             >
-              Purchase
+              {loading ? 'Processing...' : 'Purchase'}
             </button>
           </div>
         ))}
