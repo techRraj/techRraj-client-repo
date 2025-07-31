@@ -36,14 +36,14 @@ const BuyCredit = () => {
     token, 
     setShowLogin, 
     logout,
-    verifyPayment,
-    isProcessingPayment
+    verifyPayment
   } = useContext(AppContext);
   
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false); // Add this state
 
-  // Load Razorpay script - memoized to prevent unnecessary reloads
+  // Load Razorpay script
   useEffect(() => {
     if (window.Razorpay) {
       setRazorpayLoaded(true);
@@ -77,7 +77,6 @@ const BuyCredit = () => {
     };
   }, []);
 
-  // Memoized payment initialization
   const initPayment = useCallback(async (order) => {
     if (!razorpayLoaded) {
       toast.error("Payment gateway is loading. Please wait...");
@@ -95,43 +94,83 @@ const BuyCredit = () => {
         image: '/logo.png',
         handler: async (response) => {
           try {
-            await verifyPayment(response);
-            await loadCreditsData(true);
-            toast.success(
-              `Payment successful! Added ${order.notes?.credits || ''} credits`
-            );
-            setTimeout(() => navigate('/'), 2000);
+            setIsProcessingPayment(true);
+            
+            // Verify payment with backend
+            const verification = await verifyPayment(response);
+            
+            if (verification.success) {
+              await loadCreditsData(true);
+              toast.success(
+                `Payment successful! Added ${order.notes?.credits || ''} credits. ` +
+                `Transaction ID: ${response.razorpay_payment_id.substring(0, 8)}...`
+              );
+              setTimeout(() => navigate('/account'), 2000);
+            } else {
+              toast.error(verification.message || 'Payment verification failed');
+            }
           } catch (error) {
-            console.error('Payment verification failed:', error);
+            console.error('Payment verification error:', error);
             if (error.response?.data?.code === 'DUPLICATE_PAYMENT') {
               toast.info('Payment was already processed. Credits were already added.');
               await loadCreditsData(true);
+            } else if (error.response?.status === 400) {
+              toast.error('Invalid payment. Please try again or contact support.');
+            } else if (error.response?.status === 401) {
+              toast.error('Session expired. Please login again.');
+              logout();
+            } else {
+              toast.error('Payment verification failed. Please check your account balance.');
             }
+          } finally {
+            setIsProcessingPayment(false);
           }
         },
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
+          contact: user?.phone || ''
         },
         theme: {
-          color: '#3399cc'
+          color: '#3399cc',
+          hide_topbar: true
         },
         modal: {
           ondismiss: () => {
             if (!isProcessingPayment) {
-              toast.info('Payment cancelled');
+              toast.info('Payment window closed. You can retry if needed.');
             }
-          }
+          },
+          escape: false,
+          backdropclose: false
+        },
+        notes: {
+          userId: user._id,
+          planId: order.notes?.planId,
+          credits: order.notes?.credits
         }
       };
 
+      if (!options.key || !options.order_id) {
+        toast.error('Payment configuration error. Please try again later.');
+        return;
+      }
+
       const rzp = new window.Razorpay(options);
+      
+      rzp.on('payment.failed', (response) => {
+        console.error('Payment failed:', response.error);
+        toast.error(`Payment failed: ${response.error.description || 'Unknown error'}`);
+        setIsProcessingPayment(false);
+      });
+
       rzp.open();
     } catch (error) {
-      console.error('Razorpay initialization error:', error);
-      toast.error('Failed to initialize payment gateway');
+      console.error('Payment initialization error:', error);
+      toast.error('Failed to initialize payment. Please try again.');
+      setIsProcessingPayment(false);
     }
-  }, [razorpayLoaded, verifyPayment, loadCreditsData, navigate, user, isProcessingPayment]);
+  }, [razorpayLoaded, verifyPayment, loadCreditsData, navigate, user, isProcessingPayment, logout]);
 
   const handlePayment = async (planId) => {
     if (loading || isProcessingPayment) return;
