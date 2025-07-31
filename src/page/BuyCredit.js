@@ -65,8 +65,8 @@ const BuyCredit = () => {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency || "INR",
-        name: 'Your App Name',
-        description: `Purchase of ${order.notes?.credits || 'credits'}`,
+        name: 'Credits Purchase',
+        description: `${order.notes?.credits || ''} Credits`,
         order_id: order.id,
         image: '/logo.png',
         handler: async (response) => {
@@ -95,14 +95,13 @@ const BuyCredit = () => {
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
-          contact: user?.phone || ''
         },
         theme: {
           color: '#3399cc'
         },
         modal: {
           ondismiss: () => {
-            toast.info('Payment window closed');
+            toast.info('Payment cancelled');
           }
         }
       };
@@ -130,13 +129,6 @@ const BuyCredit = () => {
         return;
       }
 
-      // Debug: Log the request details
-      console.log('Creating order with:', {
-        url: `${backendUrl}/api/user/create-order`,
-        planId,
-        token: token.substring(0, 10) + '...' // Don't log full token
-      });
-
       const response = await axios.post(
         `${backendUrl}/api/user/create-order`,
         { planId },
@@ -145,7 +137,7 @@ const BuyCredit = () => {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          timeout: 10000 // 10 seconds timeout
+          timeout: 10000
         }
       );
 
@@ -155,26 +147,19 @@ const BuyCredit = () => {
         toast.error(response.data.message || "Failed to create order");
       }
     } catch (error) {
-      console.error('Payment Error:', {
-        message: error.message,
-        response: error.response?.data,
-        config: error.config
-      });
-
+      console.error('Payment Error:', error);
+      
       if (error.response) {
-        // Handle specific error statuses
         if (error.response.status === 401) {
           toast.error('Session expired. Please login again.');
           logout();
-        } else if (error.response.status === 500) {
-          toast.error('Server error. Please try again later.');
+        } else if (error.response.data?.message) {
+          toast.error(error.response.data.message);
         } else {
-          toast.error(error.response.data?.message || 'Payment failed');
+          toast.error('Payment failed. Please try again.');
         }
-      } else if (error.request) {
-        toast.error('No response from server. Check your connection.');
       } else {
-        toast.error('Payment setup failed. Please try again.');
+        toast.error('Network error. Please check your connection.');
       }
     } finally {
       setLoading(false);
