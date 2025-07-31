@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -29,11 +29,21 @@ const plans = [
 
 const BuyCredit = () => {
   const navigate = useNavigate();
-  const { user, backendUrl, loadCreditsData, token, setShowLogin, logout } = useContext(AppContext);
+  const { 
+    user, 
+    backendUrl, 
+    loadCreditsData, 
+    token, 
+    setShowLogin, 
+    logout,
+    verifyPayment,
+    isProcessingPayment
+  } = useContext(AppContext);
+  
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
-  // Load Razorpay script
+  // Load Razorpay script - memoized to prevent unnecessary reloads
   useEffect(() => {
     if (window.Razorpay) {
       setRazorpayLoaded(true);
@@ -43,18 +53,32 @@ const BuyCredit = () => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
-    script.onload = () => setRazorpayLoaded(true);
-    script.onerror = () => {
-      toast.error('Failed to load payment gateway. Please refresh the page.');
+    
+    const handleLoad = () => {
+      setRazorpayLoaded(true);
+      script.removeEventListener('load', handleLoad);
     };
+    
+    const handleError = () => {
+      toast.error('Failed to load payment gateway. Please refresh the page.');
+      script.removeEventListener('error', handleError);
+    };
+
+    script.addEventListener('load', handleLoad);
+    script.addEventListener('error', handleError);
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
+      script.removeEventListener('load', handleLoad);
+      script.removeEventListener('error', handleError);
+      if (script.parentNode) {
+        document.body.removeChild(script);
+      }
     };
   }, []);
 
-  const initPayment = async (order) => {
+  // Memoized payment initialization
+  const initPayment = useCallback(async (order) => {
     if (!razorpayLoaded) {
       toast.error("Payment gateway is loading. Please wait...");
       return;
@@ -71,25 +95,18 @@ const BuyCredit = () => {
         image: '/logo.png',
         handler: async (response) => {
           try {
-            const verificationResponse = await axios.post(
-              `${backendUrl}/api/user/verify-payment`,
-              response,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
+            await verifyPayment(response);
+            await loadCreditsData(true);
+            toast.success(
+              `Payment successful! Added ${order.notes?.credits || ''} credits`
             );
-            
-            if (verificationResponse.data.success) {
-              await loadCreditsData();
-              toast.success('Payment successful! Credits added to your account');
-              navigate('/');
+            setTimeout(() => navigate('/'), 2000);
+          } catch (error) {
+            console.error('Payment verification failed:', error);
+            if (error.response?.data?.code === 'DUPLICATE_PAYMENT') {
+              toast.info('Payment was already processed. Credits were already added.');
+              await loadCreditsData(true);
             }
-          } catch (verificationError) {
-            console.error('Payment verification failed:', verificationError);
-            toast.error(verificationError.response?.data?.message || 'Payment verification failed');
           }
         },
         prefill: {
@@ -101,7 +118,9 @@ const BuyCredit = () => {
         },
         modal: {
           ondismiss: () => {
-            toast.info('Payment cancelled');
+            if (!isProcessingPayment) {
+              toast.info('Payment cancelled');
+            }
           }
         }
       };
@@ -112,9 +131,11 @@ const BuyCredit = () => {
       console.error('Razorpay initialization error:', error);
       toast.error('Failed to initialize payment gateway');
     }
-  };
+  }, [razorpayLoaded, verifyPayment, loadCreditsData, navigate, user, isProcessingPayment]);
 
   const handlePayment = async (planId) => {
+    if (loading || isProcessingPayment) return;
+    
     try {
       setLoading(true);
       
@@ -153,10 +174,8 @@ const BuyCredit = () => {
         if (error.response.status === 401) {
           toast.error('Session expired. Please login again.');
           logout();
-        } else if (error.response.data?.message) {
-          toast.error(error.response.data.message);
         } else {
-          toast.error('Payment failed. Please try again.');
+          toast.error(error.response.data?.message || 'Payment failed. Please try again.');
         }
       } else {
         toast.error('Network error. Please check your connection.');
@@ -175,29 +194,64 @@ const BuyCredit = () => {
       style={{ padding: '20px' }}
     >
       <h1>Buy Credits</h1>
-      <button onClick={() => navigate('/subscription')}>Our Subscription</button>
+      <button 
+        onClick={() => navigate('/subscription')}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: '#3399cc',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginBottom: '20px'
+        }}
+      >
+        Our Subscription
+      </button>
       <h2>Choose the Subscription</h2>
 
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         {plans.map((item, index) => (
-          <div key={index} style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', width: '250px' }}>
-            <img src="/assets/logo_icon.svg" alt="Logo Icon" style={{ width: '50px', height: '50px' }} />
-            <h3>{item.desc}</h3>
-            <p>₹{item.price.toLocaleString()}</p>
-            <p>{item.credits} credits</p>
+          <div 
+            key={index} 
+            style={{ 
+              border: '1px solid #ccc', 
+              padding: '20px', 
+              borderRadius: '8px', 
+              width: '250px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}
+          >
+            <img 
+              src="/assets/logo_icon.svg" 
+              alt="Logo Icon" 
+              style={{ width: '50px', height: '50px', marginBottom: '15px' }} 
+            />
+            <h3 style={{ margin: '10px 0' }}>{item.desc}</h3>
+            <p style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '5px 0' }}>
+              ₹{item.price.toLocaleString()}
+            </p>
+            <p style={{ margin: '5px 0 15px 0' }}>{item.credits} credits</p>
             <button 
               onClick={() => handlePayment(item.id)}
-              disabled={loading || !razorpayLoaded}
+              disabled={loading || !razorpayLoaded || isProcessingPayment}
               style={{
                 padding: '10px 20px',
-                backgroundColor: (loading || !razorpayLoaded) ? '#cccccc' : '#3399cc',
+                backgroundColor: (loading || !razorpayLoaded || isProcessingPayment) 
+                  ? '#cccccc' 
+                  : '#3399cc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: (loading || !razorpayLoaded) ? 'not-allowed' : 'pointer'
+                cursor: (loading || !razorpayLoaded || isProcessingPayment) 
+                  ? 'not-allowed' 
+                  : 'pointer',
+                width: '100%'
               }}
             >
-              {loading ? 'Processing...' : 'Purchase'}
+              {loading || isProcessingPayment ? 'Processing...' : 'Purchase'}
             </button>
           </div>
         ))}
