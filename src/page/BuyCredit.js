@@ -83,21 +83,42 @@ const handlePayment = async (planId) => {
       return;
     }
 
-    // Step 1: Create order
-    const orderResponse = await axios.post(
-      `${backendUrl}/api/user/create-order`,
-      { planId },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 second timeout
-      }
-    );
+    // Step 1: Create order with error handling
+    let orderResponse;
+    try {
+      orderResponse = await axios.post(
+        `${backendUrl}/api/user/create-order`,
+        { planId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000 // 15 seconds timeout
+        }
+      );
 
-    if (!orderResponse.data.success) {
-      throw new Error(orderResponse.data.message || "Failed to create order");
+      if (!orderResponse.data?.success) {
+        throw new Error(orderResponse.data?.message || "Failed to create order");
+      }
+    } catch (error) {
+      console.error('Order Creation Error:', error);
+      let errorMessage = 'Failed to create payment order';
+      
+      if (error.response) {
+        // Server responded with error status
+        errorMessage = error.response.data?.message || errorMessage;
+        if (error.response.status === 401) {
+          logout();
+          navigate('/login');
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      toast.error(errorMessage);
+      return;
     }
 
     // Step 2: Initialize Razorpay payment
@@ -106,7 +127,7 @@ const handlePayment = async (planId) => {
       amount: orderResponse.data.order.amount,
       currency: orderResponse.data.order.currency,
       name: 'Credits Purchase',
-      description: `Purchase of ${orderResponse.data.plan.credits} credits`,
+      description: `${orderResponse.data.plan.credits} Credits`,
       order_id: orderResponse.data.order.id,
       image: '/logo.png',
       handler: async (response) => {
@@ -123,66 +144,64 @@ const handlePayment = async (planId) => {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json'
               },
-              timeout: 10000
+              timeout: 15000
             }
           );
           
           if (verificationResponse.data.success) {
             await loadCreditsData();
-            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added to your account`);
+            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
             navigate('/');
           } else {
             throw new Error(verificationResponse.data.message || 'Payment verification failed');
           }
         } catch (error) {
-          console.error('Payment Verification Error:', error);
-          toast.error(error.response?.data?.message || error.message || 'Payment verification failed');
+          console.error('Verification Error:', error);
+          let errorMessage = 'Payment verification failed';
+          
+          if (error.response) {
+            errorMessage = error.response.data?.message || errorMessage;
+            if (error.response.status === 401) {
+              logout();
+            }
+          }
+          
+          toast.error(errorMessage);
         }
       },
       prefill: {
         name: user.name || '',
-        email: user.email || '',
-        contact: user.phone || ''
+        email: user.email || ''
       },
       theme: {
         color: '#3399cc'
+      },
+      modal: {
+        ondismiss: () => {
+          toast.info('Payment cancelled');
+        }
       }
     };
 
     // Check if Razorpay is loaded
     if (typeof window.Razorpay === 'undefined') {
-      throw new Error('Payment gateway not loaded. Please refresh the page.');
+      toast.error('Payment system not loaded. Please refresh the page.');
+      return;
     }
 
     const rzp = new window.Razorpay(options);
     
-    // Add error handler
+    // Add error handler for payment failures
     rzp.on('payment.failed', (response) => {
-      toast.error(`Payment failed: ${response.error.description}`);
       console.error('Payment failed:', response);
+      toast.error(`Payment failed: ${response.error.description}`);
     });
     
     rzp.open();
 
   } catch (error) {
-    console.error('Payment Error:', error);
-    
-    // Handle specific error cases
-    if (error.response) {
-      // Server responded with error status
-      if (error.response.status === 401) {
-        toast.error('Session expired. Please login again.');
-        logout();
-      } else {
-        toast.error(error.response.data?.message || 'Payment processing failed');
-      }
-    } else if (error.request) {
-      // Request was made but no response received
-      toast.error('Network error. Please check your connection.');
-    } else {
-      // Other errors
-      toast.error(error.message || 'Payment processing failed');
-    }
+    console.error('Payment Processing Error:', error);
+    toast.error(error.message || 'Payment processing failed');
   } finally {
     setLoading(false);
   }
