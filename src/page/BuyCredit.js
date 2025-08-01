@@ -73,7 +73,11 @@ const BuyCredit = () => {
           try {
             const verificationResponse = await axios.post(
               `${backendUrl}/api/user/verify-payment`,
-              response,
+             {
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_signature: response.razorpay_signature
+      },
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
