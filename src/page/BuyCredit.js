@@ -34,7 +34,8 @@ const BuyCredit = () => {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   // Load Razorpay script
-  useEffect(() => {
+ useEffect(() => {
+  const loadRazorpay = async () => {
     if (window.Razorpay) {
       setRazorpayLoaded(true);
       return;
@@ -43,22 +44,39 @@ const BuyCredit = () => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
-    script.onload = () => setRazorpayLoaded(true);
+    script.id = 'razorpay-script';
+    
+    script.onload = () => {
+      if (window.Razorpay) {
+        setRazorpayLoaded(true);
+      } else {
+        toast.error('Razorpay failed to load properly');
+        setRazorpayLoaded(false);
+      }
+    };
+    
     script.onerror = () => {
       toast.error('Failed to load payment gateway. Please refresh the page.');
+      setRazorpayLoaded(false);
     };
+
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
+      const scriptElement = document.getElementById('razorpay-script');
+      if (scriptElement) {
+        document.body.removeChild(scriptElement);
+      }
     };
-  }, []);
+  };
 
- const handlePayment = async (planId) => {
+  loadRazorpay();
+}, []);
+
+const handlePayment = async (planId) => {
   try {
     setLoading(true);
     
-    // Check authentication
     if (!user || !token) {
       setShowLogin(true);
       toast.error('Please login to continue');
@@ -78,11 +96,11 @@ const BuyCredit = () => {
       }
     );
 
-    if (!orderResponse.data.success) {
-      throw new Error(orderResponse.data.message || "Failed to create order");
+    if (!orderResponse.data?.success) {
+      throw new Error(orderResponse.data?.message || "Failed to create order");
     }
 
-    // Initialize Razorpay
+    // Initialize Razorpay with proper error handling
     const options = {
       key: process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: orderResponse.data.order.amount,
@@ -117,7 +135,10 @@ const BuyCredit = () => {
           }
         } catch (error) {
           console.error('Verification Error:', error);
-          toast.error(error.message || 'Payment verification failed');
+          toast.error(error.response?.data?.message || error.message || 'Payment verification failed');
+          if (error.response?.status === 401) {
+            logout();
+          }
         }
       },
       prefill: {
@@ -134,15 +155,21 @@ const BuyCredit = () => {
       }
     };
 
+    // Check if Razorpay is loaded
+    if (typeof window.Razorpay === 'undefined') {
+      throw new Error('Razorpay payment gateway failed to load');
+    }
+
     const rzp = new window.Razorpay(options);
+    rzp.on('payment.failed', (response) => {
+      toast.error(`Payment failed: ${response.error.description}`);
+      console.error('Payment failed:', response);
+    });
     rzp.open();
 
   } catch (error) {
     console.error('Payment Error:', error);
     toast.error(error.response?.data?.message || error.message || 'Payment processing failed');
-    if (error.response?.status === 401) {
-      logout();
-    }
   } finally {
     setLoading(false);
   }
