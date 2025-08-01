@@ -83,51 +83,30 @@ const handlePayment = async (planId) => {
       return;
     }
 
-    // Step 1: Create order with error handling
-    let orderResponse;
-    try {
-      orderResponse = await axios.post(
-        `${backendUrl}/api/user/create-order`,
-        { planId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 15000 // 15 seconds timeout
-        }
-      );
+    // Create order
+    const orderResponse = await axios.post(
+      `${backendUrl}/api/user/create-order`,
+      { planId },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      }
+    );
 
-      if (!orderResponse.data?.success) {
-        throw new Error(orderResponse.data?.message || "Failed to create order");
-      }
-    } catch (error) {
-      console.error('Order Creation Error:', error);
-      let errorMessage = 'Failed to create payment order';
-      
-      if (error.response) {
-        // Server responded with error status
-        errorMessage = error.response.data?.message || errorMessage;
-        if (error.response.status === 401) {
-          logout();
-          navigate('/login');
-        }
-      } else if (error.request) {
-        // Request was made but no response received
-        errorMessage = 'Network error. Please check your connection.';
-      }
-      
-      toast.error(errorMessage);
-      return;
+    if (!orderResponse.data.success) {
+      throw new Error(orderResponse.data.message || "Failed to create order");
     }
 
-    // Step 2: Initialize Razorpay payment
+    // Initialize Razorpay
     const options = {
       key: process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: orderResponse.data.order.amount,
       currency: orderResponse.data.order.currency,
-      name: 'Credits Purchase',
-      description: `${orderResponse.data.plan.credits} Credits`,
+      name: 'AI Image Generator',
+      description: `Purchase ${orderResponse.data.plan.credits} credits`,
       order_id: orderResponse.data.order.id,
       image: '/logo.png',
       handler: async (response) => {
@@ -143,55 +122,33 @@ const handlePayment = async (planId) => {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json'
-              },
-              timeout: 15000
+              }
             }
           );
           
           if (verificationResponse.data.success) {
             await loadCreditsData();
             toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
-            navigate('/');
           } else {
             throw new Error(verificationResponse.data.message || 'Payment verification failed');
           }
         } catch (error) {
-          console.error('Verification Error:', error);
-          let errorMessage = 'Payment verification failed';
-          
-          if (error.response) {
-            errorMessage = error.response.data?.message || errorMessage;
-            if (error.response.status === 401) {
-              logout();
-            }
-          }
-          
-          toast.error(errorMessage);
+          console.error('Payment Verification Error:', error);
+          toast.error(error.response?.data?.message || 'Payment verification failed');
         }
       },
       prefill: {
         name: user.name || '',
-        email: user.email || ''
+        email: user.email || '',
+        contact: user.phone || ''
       },
       theme: {
         color: '#3399cc'
-      },
-      modal: {
-        ondismiss: () => {
-          toast.info('Payment cancelled');
-        }
       }
     };
 
-    // Check if Razorpay is loaded
-    if (typeof window.Razorpay === 'undefined') {
-      toast.error('Payment system not loaded. Please refresh the page.');
-      return;
-    }
-
     const rzp = new window.Razorpay(options);
     
-    // Add error handler for payment failures
     rzp.on('payment.failed', (response) => {
       console.error('Payment failed:', response);
       toast.error(`Payment failed: ${response.error.description}`);
@@ -200,8 +157,25 @@ const handlePayment = async (planId) => {
     rzp.open();
 
   } catch (error) {
-    console.error('Payment Processing Error:', error);
-    toast.error(error.message || 'Payment processing failed');
+    console.error('Payment Error:', {
+      error: error.message,
+      response: error.response?.data,
+      planId
+    });
+    
+    let errorMessage = 'Payment processing failed';
+    if (error.response) {
+      errorMessage = error.response.data?.message || errorMessage;
+      if (error.response.status === 401) {
+        logout();
+      }
+    } else if (error.request) {
+      errorMessage = 'Network error. Please check your connection.';
+    } else {
+      errorMessage = error.message || errorMessage;
+    }
+    
+    toast.error(errorMessage);
   } finally {
     setLoading(false);
   }
