@@ -139,8 +139,7 @@ const handlePayment = async (planId) => {
       },
       prefill: {
         name: user.name || '',
-        email: user.email || '',
-        contact: user.phone || ''
+        email: user.email || ''
       },
       theme: {
         color: '#3399cc'
