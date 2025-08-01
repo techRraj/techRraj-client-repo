@@ -29,7 +29,7 @@ const plans = [
 
 const BuyCredit = () => {
   const navigate = useNavigate();
-  const { user, backendUrl, loadCreditsData, token, setShowLogin } = useContext(AppContext);
+  const { user, backendUrl, loadCreditsData, token, setShowLogin ,logout} = useContext(AppContext);
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
@@ -58,8 +58,10 @@ const BuyCredit = () => {
   try {
     setLoading(true);
     
-    if (!user) {
+    // Check authentication
+    if (!user || !token) {
       setShowLogin(true);
+      toast.error('Please login to continue');
       return;
     }
 
@@ -76,60 +78,71 @@ const BuyCredit = () => {
       }
     );
 
-    if (orderResponse.data.success) {
-      // Initialize Razorpay
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: orderResponse.data.order.amount,
-        currency: orderResponse.data.order.currency,
-        name: 'Credits Purchase',
-        description: `${orderResponse.data.plan.credits} Credits`,
-        order_id: orderResponse.data.order.id,
-        image: '/logo.png',
-        handler: async (response) => {
-          try {
-            const verificationResponse = await axios.post(
-              `${backendUrl}/api/user/verify-payment`,
-              {
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-            
-            if (verificationResponse.data.success) {
-              await loadCreditsData();
-              toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
-              navigate('/');
-            } else {
-              toast.error(verificationResponse.data.message || 'Payment verification failed');
-            }
-          } catch (error) {
-            console.error('Verification Error:', error.response?.data || error.message);
-            toast.error(error.response?.data?.message || 'Payment verification failed');
-          }
-        },
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-        },
-        theme: {
-          color: '#3399cc'
-        }
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+    if (!orderResponse.data.success) {
+      throw new Error(orderResponse.data.message || "Failed to create order");
     }
+
+    // Initialize Razorpay
+    const options = {
+      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+      amount: orderResponse.data.order.amount,
+      currency: orderResponse.data.order.currency,
+      name: 'Credits Purchase',
+      description: `${orderResponse.data.plan.credits} Credits`,
+      order_id: orderResponse.data.order.id,
+      image: '/logo.png',
+      handler: async (response) => {
+        try {
+          const verificationResponse = await axios.post(
+            `${backendUrl}/api/user/verify-payment`,
+            {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (verificationResponse.data.success) {
+            await loadCreditsData();
+            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
+            navigate('/');
+          } else {
+            throw new Error(verificationResponse.data.message || 'Payment verification failed');
+          }
+        } catch (error) {
+          console.error('Verification Error:', error);
+          toast.error(error.message || 'Payment verification failed');
+        }
+      },
+      prefill: {
+        name: user?.name || '',
+        email: user?.email || '',
+      },
+      theme: {
+        color: '#3399cc'
+      },
+      modal: {
+        ondismiss: () => {
+          toast.info('Payment cancelled');
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+
   } catch (error) {
-    console.error('Payment Error:', error.response?.data || error.message);
-    toast.error(error.response?.data?.message || 'Payment processing failed');
+    console.error('Payment Error:', error);
+    toast.error(error.response?.data?.message || error.message || 'Payment processing failed');
+    if (error.response?.status === 401) {
+      logout();
+    }
   } finally {
     setLoading(false);
   }
@@ -150,11 +163,13 @@ const BuyCredit = () => {
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         {plans.map((item, index) => (
           <div key={index} style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', width: '250px' }}>
-<img 
-        src="/assets/logo_icon.svg" 
-        alt="Logo Icon" 
-        style={{ width: '50px', height: '50px' }}
-      /> 
+<img
+  src="/assets/logo_icon.svg"
+  alt="Logo Icon"
+  width={50}  // React style width
+  height={50} // React style height
+  style={{ display: 'block' }}
+/>
                  <h3>{item.desc}</h3>
             <p>₹{item.price.toLocaleString()}</p>
             <p>{item.credits} credits</p>
