@@ -54,103 +54,86 @@ const BuyCredit = () => {
     };
   }, []);
 
-  const handlePayment = async (planId) => {
-    try {
-      setLoading(true);
-      
-      if (!user) {
-        setShowLogin(true);
-        return;
-      }
-
-      if (!token) {
-        toast.error('Your session has expired. Please login again.');
-        logout();
-        return;
-      }
-
-      // Step 1: Create order
-      const orderResponse = await axios.post(
-        `${backendUrl}/api/user/create-order`,
-        { planId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (orderResponse.data.success) {
-        // Step 2: Initialize Razorpay payment
-        const options = {
-          key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-          amount: orderResponse.data.order.amount,
-          currency: orderResponse.data.order.currency,
-          name: 'Credits Purchase',
-          description: `${orderResponse.data.plan.credits} Credits`,
-          order_id: orderResponse.data.order.id,
-          image: '/logo.png',
-          handler: async (response) => {
-            console.log('Razorpay Response:', response);
-            try {
-              const verificationResponse = await axios.post(
-                `${backendUrl}/api/user/verify-payment`,
-                {
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature
-                },
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                }
-              );
-              
-              console.log('Verification Response:', verificationResponse.data);
-              
-              if (verificationResponse.data.success) {
-                await loadCreditsData();
-                toast.success(`Payment successful! ${verificationResponse.data.credits} credits added to your account`);
-                navigate('/');
-              } else {
-                toast.error(verificationResponse.data.message || 'Payment verification failed');
-              }
-            } catch (error) {
-              console.error('Payment Error:', {
-                error: error.response?.data || error.message
-              });
-              toast.error(error.response?.data?.message || 'Payment verification failed');
-            }
-          },
-          prefill: {
-            name: user?.name || '',
-            email: user?.email || '',
-          },
-          theme: {
-            color: '#3399cc'
-          },
-          modal: {
-            ondismiss: () => {
-              toast.info('Payment cancelled');
-            }
-          }
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } else {
-        toast.error(orderResponse.data.message || "Failed to create order");
-      }
-    } catch (error) {
-      console.error('Payment Error:', error);
-      toast.error(error.response?.data?.message || 'Payment processing failed');
-    } finally {
-      setLoading(false);
+ const handlePayment = async (planId) => {
+  try {
+    setLoading(true);
+    
+    if (!user) {
+      setShowLogin(true);
+      return;
     }
-  };
+
+    // Create order
+    const orderResponse = await axios.post(
+      `${backendUrl}/api/user/create-order`,
+      { planId },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
+
+    if (orderResponse.data.success) {
+      // Initialize Razorpay
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: orderResponse.data.order.amount,
+        currency: orderResponse.data.order.currency,
+        name: 'Credits Purchase',
+        description: `${orderResponse.data.plan.credits} Credits`,
+        order_id: orderResponse.data.order.id,
+        image: '/logo.png',
+        handler: async (response) => {
+          try {
+            const verificationResponse = await axios.post(
+              `${backendUrl}/api/user/verify-payment`,
+              {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (verificationResponse.data.success) {
+              await loadCreditsData();
+              toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
+              navigate('/');
+            } else {
+              toast.error(verificationResponse.data.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Verification Error:', error.response?.data || error.message);
+            toast.error(error.response?.data?.message || 'Payment verification failed');
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+        },
+        theme: {
+          color: '#3399cc'
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    }
+  } catch (error) {
+    console.error('Payment Error:', error.response?.data || error.message);
+    toast.error(error.response?.data?.message || 'Payment processing failed');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <motion.div
@@ -167,8 +150,12 @@ const BuyCredit = () => {
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         {plans.map((item, index) => (
           <div key={index} style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', width: '250px' }}>
-            <img src="/assets/logo_icon.svg" alt="Logo Icon" style={{ width: '50px', height: '50px' }} />
-            <h3>{item.desc}</h3>
+<img 
+        src="/assets/logo_icon.svg" 
+        alt="Logo Icon" 
+        style={{ width: '50px', height: '50px' }}
+      /> 
+                 <h3>{item.desc}</h3>
             <p>₹{item.price.toLocaleString()}</p>
             <p>{item.credits} credits</p>
             <button 
