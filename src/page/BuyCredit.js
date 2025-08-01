@@ -83,7 +83,7 @@ const handlePayment = async (planId) => {
       return;
     }
 
-    // Create order
+    // Step 1: Create order
     const orderResponse = await axios.post(
       `${backendUrl}/api/user/create-order`,
       { planId },
@@ -92,21 +92,21 @@ const handlePayment = async (planId) => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000
+        timeout: 10000 // 10 second timeout
       }
     );
 
-    if (!orderResponse.data?.success) {
-      throw new Error(orderResponse.data?.message || "Failed to create order");
+    if (!orderResponse.data.success) {
+      throw new Error(orderResponse.data.message || "Failed to create order");
     }
 
-    // Initialize Razorpay with proper error handling
+    // Step 2: Initialize Razorpay payment
     const options = {
       key: process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: orderResponse.data.order.amount,
       currency: orderResponse.data.order.currency,
       name: 'Credits Purchase',
-      description: `${orderResponse.data.plan.credits} Credits`,
+      description: `Purchase of ${orderResponse.data.plan.credits} credits`,
       order_id: orderResponse.data.order.id,
       image: '/logo.png',
       handler: async (response) => {
@@ -122,54 +122,67 @@ const handlePayment = async (planId) => {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json'
-              }
+              },
+              timeout: 10000
             }
           );
           
           if (verificationResponse.data.success) {
             await loadCreditsData();
-            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
+            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added to your account`);
             navigate('/');
           } else {
             throw new Error(verificationResponse.data.message || 'Payment verification failed');
           }
         } catch (error) {
-          console.error('Verification Error:', error);
+          console.error('Payment Verification Error:', error);
           toast.error(error.response?.data?.message || error.message || 'Payment verification failed');
-          if (error.response?.status === 401) {
-            logout();
-          }
         }
       },
       prefill: {
-        name: user?.name || '',
-        email: user?.email || '',
+        name: user.name || '',
+        email: user.email || '',
+        contact: user.phone || ''
       },
       theme: {
         color: '#3399cc'
-      },
-      modal: {
-        ondismiss: () => {
-          toast.info('Payment cancelled');
-        }
       }
     };
 
     // Check if Razorpay is loaded
     if (typeof window.Razorpay === 'undefined') {
-      throw new Error('Razorpay payment gateway failed to load');
+      throw new Error('Payment gateway not loaded. Please refresh the page.');
     }
 
     const rzp = new window.Razorpay(options);
+    
+    // Add error handler
     rzp.on('payment.failed', (response) => {
       toast.error(`Payment failed: ${response.error.description}`);
       console.error('Payment failed:', response);
     });
+    
     rzp.open();
 
   } catch (error) {
     console.error('Payment Error:', error);
-    toast.error(error.response?.data?.message || error.message || 'Payment processing failed');
+    
+    // Handle specific error cases
+    if (error.response) {
+      // Server responded with error status
+      if (error.response.status === 401) {
+        toast.error('Session expired. Please login again.');
+        logout();
+      } else {
+        toast.error(error.response.data?.message || 'Payment processing failed');
+      }
+    } else if (error.request) {
+      // Request was made but no response received
+      toast.error('Network error. Please check your connection.');
+    } else {
+      // Other errors
+      toast.error(error.message || 'Payment processing failed');
+    }
   } finally {
     setLoading(false);
   }
