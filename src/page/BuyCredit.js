@@ -29,7 +29,7 @@ const plans = [
 
 const BuyCredit = () => {
   const navigate = useNavigate();
-  const { user, backendUrl, loadCreditsData, token, setShowLogin, logout } = useContext(AppContext);
+  const { user, backendUrl, loadCreditsData, token, setShowLogin } = useContext(AppContext);
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
