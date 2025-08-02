@@ -8,68 +8,105 @@ export const AppContext = createContext();
 const AppContextProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [token, setToken] = useState(() => {
+    const storedToken = localStorage.getItem("token");
+    return storedToken || "";
+  });
   const [credit, setCredit] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Properly formatted backend URL
   const backendUrl = process.env.REACT_APP_BACKEND_URL?.trim().replace(/\/+$/, "") || "";
-
   const navigate = useNavigate();
 
+  // Store token in localStorage when it changes
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
     } else {
       localStorage.removeItem("token");
+      setUser(null);
+      setCredit(0);
     }
   }, [token]);
 
   const loadCreditsData = useCallback(async (signal) => {
-  if (!token) return;
-  
-  try {
-    const response = await axios.get(`${backendUrl}/api/user/credits`, {
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      signal,
-    });
+    if (!token) {
+      setCredit(0);
+      return;
+    }
 
-    if (response.data.success) {
-      setCredit(response.data.credits);
-      // Make sure we're updating user data if it's returned
-      if (response.data.user) {
-        setUser(response.data.user);
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${backendUrl}/api/user/credits`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        signal,
+      });
+
+      if (response.data.success) {
+        setCredit(response.data.credits);
+        if (response.data.user) {
+          setUser(response.data.user);
+        }
       }
-    } else {
-      throw new Error(response.data.message || "Failed to load user data");
+    } catch (error) {
+      if (axios.isCancel(error)) return;
+      
+      console.error("Error loading credits:", error);
+      
+      if (error.response?.status === 401 && token) {
+        setToken("");
+        toast.error("Session expired. Please log in again.");
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    if (axios.isCancel(error)) return;
-    
-    console.error("Error loading credits:", error);
-    if (error.response?.status === 401) {
-      // Clear invalid token
-      setToken("");
-      setUser(null);
-      localStorage.removeItem("token");
-      toast.error("Session expired. Please log in again.");
-    }
-  }
-}, [token, backendUrl]);
+  }, [token, backendUrl]);
 
+  // Load credits when token changes
   useEffect(() => {
     const controller = new AbortController();
     loadCreditsData(controller.signal);
     return () => controller.abort();
   }, [token, loadCreditsData]);
 
+  const loginUser = useCallback(async (credentials) => {
+    try {
+      const response = await axios.post(`${backendUrl}/api/user/login`, credentials);
+      if (response.data.success) {
+        setToken(response.data.token);
+        setUser(response.data.user);
+        toast.success("Login successful!");
+        return true;
+      }
+      return false;
+    } catch (error) {
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.response) {
+        switch (error.response.status) {
+          case 401:
+            errorMessage = 'Invalid email or password';
+            break;
+          case 500:
+            errorMessage = 'Server error. Please try again later.';
+            break;
+          default:
+            errorMessage = error.response.data?.message || errorMessage;
+        }
+      }
+      
+      toast.error(errorMessage);
+      return false;
+    }
+  }, [backendUrl]);
+
   const generateImage = async (prompt) => {
     try {
-      const fullUrl = `${backendUrl}/api/image/generate-image`.replace(/([^:]\/)\/+/g, "$1");
       const response = await axios.post(
-        fullUrl,
+        `${backendUrl}/api/image/generate-image`,
         { prompt },
         { 
           headers: { 
@@ -82,9 +119,8 @@ const AppContextProvider = ({ children }) => {
       if (response.data.success) {
         await loadCreditsData();
         return response.data.resultImage;
-      } else {
-        throw new Error(response.data.message || "Failed to generate image");
       }
+      throw new Error(response.data.message || "Failed to generate image");
     } catch (error) {
       toast.error(error.message);
       if (error.response?.data?.creditBalance === 0) {
@@ -96,7 +132,6 @@ const AppContextProvider = ({ children }) => {
 
   const logout = () => {
     setToken("");
-    setUser(null);
     toast.success("Logged out successfully");
   };
 
@@ -115,6 +150,8 @@ const AppContextProvider = ({ children }) => {
         loadCreditsData,
         logout,
         generateImage,
+        loginUser,
+        isLoading
       }}
     >
       {children}

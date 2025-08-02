@@ -2182,16 +2182,52 @@ background-color: #0000FF;
 }
 
 .spinner {
-  width: 20px;
+   width: 20px;
   height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255,255,255,0.3);
   border-radius: 50%;
-  border-top-color: white;
+  border-top-color: hsl(0, 0%, 100%);
   animation: spin 1s ease-in-out infinite;
+  margin: 0 auto;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.auth-link-button {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  color: var(--primary-color);
+}
+
+.auth-link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.password-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 8px;
 }
 
 @keyframes fadeIn {

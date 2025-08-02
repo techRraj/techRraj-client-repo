@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useCallback } from 'react';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
@@ -16,69 +16,97 @@ const Login = () => {
   
   const { setShowLogin, backendUrl, setToken, setUser } = useContext(AppContext);
 
-  const validateForm = () => {
+  // Memoized validation function
+  const validateForm = useCallback(() => {
     const newErrors = {};
+    const { email, password } = formData;
     
-    if (!formData.email) {
+    if (!email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = 'Please enter a valid email';
     }
     
-    if (!formData.password) {
+    if (!password) {
       newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData]);
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!validateForm()) return;
-  
-  setIsLoading(true);
-  
-  try {
-    const { data } = await axios.post(`${backendUrl}/api/user/login`, {
-      email: formData.email,
-      password: formData.password
-    });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
     
-    if (data.success) {
-      setToken(data.token);
-      setUser(data.user);
-      setShowLogin(false);
-      toast.success('Login successful!');
-    }
-  } catch (error) {
-    if (error.response) {
+    setIsLoading(true);
+    
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/user/login`, {
+        email: formData.email.toLowerCase().trim(),
+        password: formData.password
+      }, {
+        timeout: 10000 // 10 second timeout
+      });
+      
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
+        setShowLogin(false);
+        toast.success('Login successful!');
+      }
+    } catch (error) {
       let errorMessage = 'Login failed. Please try again.';
       
-      switch (error.response.status) {
-        case 401:
-          errorMessage = 'Invalid email or password';
-          break;
-        case 500:
-          errorMessage = 'Server error. Please try again later.';
-          break;
-        default:
-          errorMessage = `Request failed with status ${error.response.status}`;
+      if (error.response) {
+        switch (error.response.status) {
+          case 400:
+            errorMessage = 'Invalid request data';
+            break;
+          case 401:
+            errorMessage = 'Invalid email or password';
+            break;
+          case 403:
+            errorMessage = 'Account not verified. Please check your email.';
+            break;
+          case 429:
+            errorMessage = 'Too many attempts. Please try again later.';
+            break;
+          case 500:
+            errorMessage = 'Server error. Please try again later.';
+            break;
+          default:
+            errorMessage = `Request failed with status ${error.response.status}`;
+        }
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Please try again.';
+      } else if (error.message === 'Network Error') {
+        errorMessage = 'Network error. Please check your connection.';
       }
       
       toast.error(errorMessage);
-    } else {
-      toast.error('Network error. Please check your connection.');
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
+    }
   };
 
   return (
@@ -87,7 +115,10 @@ const Login = () => {
         <FiX 
           className="close-button" 
           size={24} 
-          onClick={() => setShowLogin(false)} 
+          onClick={() => !isLoading && setShowLogin(false)}
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && !isLoading && setShowLogin(false)}
+          aria-label="Close login"
         />
         
         <h1 className="auth-title">Login</h1>
@@ -99,56 +130,77 @@ const Login = () => {
         <form 
           className="auth-form" 
           onSubmit={handleSubmit}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
+          noValidate
+          aria-label="Login form"
         >
           <div className={`input-group ${errors.email ? 'error-input' : ''}`}>
-            <FiMail size={20} />
+            <FiMail size={20} className="input-icon" aria-hidden="true" />
             <input
               type="email"
               name="email"
               placeholder="Email Address"
               value={formData.email}
               onChange={handleChange}
+              onKeyDown={handleKeyDown}
               autoComplete="username"
               disabled={isLoading}
+              aria-label="Email address"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
             />
           </div>
-          {errors.email && <span className="error-text">{errors.email}</span>}
+          {errors.email && (
+            <span id="email-error" className="error-text" role="alert">
+              {errors.email}
+            </span>
+          )}
           
           <div className={`input-group ${errors.password ? 'error-input' : ''}`}>
-            <FiLock size={20} />
+            <FiLock size={20} className="input-icon" aria-hidden="true" />
             <input
               type={showPassword ? 'text' : 'password'}
               name="password"
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
+              onKeyDown={handleKeyDown}
               autoComplete="current-password"
               disabled={isLoading}
+              aria-label="Password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : undefined}
             />
-            {showPassword ? (
-              <FiEyeOff 
-                size={20} 
-                onClick={() => setShowPassword(false)}
-                style={{ cursor: 'pointer', opacity: 0.7 }}
-              />
-            ) : (
-              <FiEye 
-                size={20} 
-                onClick={() => setShowPassword(true)}
-                style={{ cursor: 'pointer', opacity: 0.7 }}
-              />
-            )}
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                <FiEyeOff size={20} aria-hidden="true" />
+              ) : (
+                <FiEye size={20} aria-hidden="true" />
+              )}
+            </button>
           </div>
-          {errors.password && <span className="error-text">{errors.password}</span>}
+          {errors.password && (
+            <span id="password-error" className="error-text" role="alert">
+              {errors.password}
+            </span>
+          )}
           
           <button 
             type="submit" 
             className="auth-button"
             disabled={isLoading}
+            aria-busy={isLoading}
           >
             {isLoading ? (
-              <div className="spinner"></div>
+              <>
+                <span className="sr-only">Loading...</span>
+                <div className="spinner" aria-hidden="true"></div>
+              </>
             ) : (
               'Login'
             )}
@@ -156,9 +208,14 @@ const Login = () => {
           
           <p className="auth-link">
             Don't have an account?{' '}
-            <span onClick={() => !isLoading && setShowLogin('register')}>
+            <button
+              type="button"
+              className="auth-link-button"
+              onClick={() => !isLoading && setShowLogin('register')}
+              disabled={isLoading}
+            >
               Sign up
-            </span>
+            </button>
           </p>
         </form>
       </div>
