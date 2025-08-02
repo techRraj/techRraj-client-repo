@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -29,156 +29,162 @@ const plans = [
 
 const BuyCredit = () => {
   const navigate = useNavigate();
-  const { user, backendUrl, loadCreditsData, token, setShowLogin ,logout} = useContext(AppContext);
+  const { user, backendUrl, loadCreditsData, token: contextToken, setShowLogin, logout } = useContext(AppContext);
   const [loading, setLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [token, setToken] = useState(contextToken || localStorage.getItem('token') || '');
+
+  // Update token if contextToken changes
+  useEffect(() => {
+    setToken(contextToken || localStorage.getItem('token') || '');
+  }, [contextToken]);
 
   // Load Razorpay script
- useEffect(() => {
-  const loadRazorpay = async () => {
-    if (window.Razorpay) {
-      setRazorpayLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.id = 'razorpay-script';
-    
-    script.onload = () => {
+  useEffect(() => {
+    const loadRazorpay = async () => {
       if (window.Razorpay) {
         setRazorpayLoaded(true);
-      } else {
-        toast.error('Razorpay failed to load properly');
-        setRazorpayLoaded(false);
+        return;
       }
-    };
-    
-    script.onerror = () => {
-      toast.error('Failed to load payment gateway. Please refresh the page.');
-      setRazorpayLoaded(false);
-    };
 
-    document.body.appendChild(script);
-
-    return () => {
-      const scriptElement = document.getElementById('razorpay-script');
-      if (scriptElement) {
-        document.body.removeChild(scriptElement);
-      }
-    };
-  };
-
-  loadRazorpay();
-}, []);
-
-const handlePayment = async (planId) => {
-  try {
-    setLoading(true);
-    
-    if (!user || !token) {
-      setShowLogin(true);
-      toast.error('Please login to continue');
-      return;
-    }
-
-    // Create order
-    const orderResponse = await axios.post(
-      `${backendUrl}/api/user/create-order`,
-      { planId },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 15000
-      }
-    );
-
-    if (!orderResponse.data.success) {
-      throw new Error(orderResponse.data.message || "Failed to create order");
-    }
-
-    // Initialize Razorpay
-    const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: orderResponse.data.order.amount,
-      currency: orderResponse.data.order.currency,
-      name: 'AI Image Generator',
-      description: `Purchase ${orderResponse.data.plan.credits} credits`,
-      order_id: orderResponse.data.order.id,
-      image: '/logo.png',
-      handler: async (response) => {
-        try {
-          const verificationResponse = await axios.post(
-            `${backendUrl}/api/user/verify-payment`,
-            {
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          if (verificationResponse.data.success) {
-            await loadCreditsData();
-            toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
-          } else {
-            throw new Error(verificationResponse.data.message || 'Payment verification failed');
-          }
-        } catch (error) {
-          console.error('Payment Verification Error:', error);
-          toast.error(error.response?.data?.message || 'Payment verification failed');
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.id = 'razorpay-script';
+      
+      script.onload = () => {
+        if (window.Razorpay) {
+          setRazorpayLoaded(true);
+        } else {
+          toast.error('Razorpay failed to load properly');
+          setRazorpayLoaded(false);
         }
-      },
-      prefill: {
-        name: user.name || '',
-        email: user.email || ''
-      },
-      theme: {
-        color: '#3399cc'
-      }
+      };
+      
+      script.onerror = () => {
+        toast.error('Failed to load payment gateway. Please refresh the page.');
+        setRazorpayLoaded(false);
+      };
+
+      document.body.appendChild(script);
+
+      return () => {
+        const scriptElement = document.getElementById('razorpay-script');
+        if (scriptElement) {
+          document.body.removeChild(scriptElement);
+        }
+      };
     };
 
-    const rzp = new window.Razorpay(options);
-    
-    rzp.on('payment.failed', (response) => {
-      console.error('Payment failed:', response);
-      toast.error(`Payment failed: ${response.error.description}`);
-    });
-    
-    rzp.open();
+    loadRazorpay();
+  }, []);
 
-  } catch (error) {
-    console.error('Payment Error:', {
-      error: error.message,
-      response: error.response?.data,
-      planId
-    });
-    
-    let errorMessage = 'Payment processing failed';
-    if (error.response) {
-      errorMessage = error.response.data?.message || errorMessage;
-      if (error.response.status === 401) {
-        logout();
+  const handlePayment = useCallback(async (planId) => {
+    try {
+      setLoading(true);
+      
+      if (!user || !token) {
+        setShowLogin(true);
+        toast.error('Please login to continue');
+        return;
       }
-    } else if (error.request) {
-      errorMessage = 'Network error. Please check your connection.';
-    } else {
-      errorMessage = error.message || errorMessage;
+
+      // Create order
+      const orderResponse = await axios.post(
+        `${backendUrl}/api/user/create-order`,
+        { planId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000
+        }
+      );
+
+      if (!orderResponse.data.success) {
+        throw new Error(orderResponse.data.message || "Failed to create order");
+      }
+
+      // Initialize Razorpay
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: orderResponse.data.order.amount,
+        currency: orderResponse.data.order.currency,
+        name: 'AI Image Generator',
+        description: `Purchase ${orderResponse.data.plan.credits} credits`,
+        order_id: orderResponse.data.order.id,
+        image: '/logo.png',
+        handler: async (response) => {
+          try {
+            const verificationResponse = await axios.post(
+              `${backendUrl}/api/user/verify-payment`,
+              {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (verificationResponse.data.success) {
+              await loadCreditsData();
+              toast.success(`Payment successful! ${verificationResponse.data.credits} credits added`);
+            } else {
+              throw new Error(verificationResponse.data.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Payment Verification Error:', error);
+            toast.error(error.response?.data?.message || 'Payment verification failed');
+          }
+        },
+        prefill: {
+          name: user.name || '',
+          email: user.email || ''
+        },
+        theme: {
+          color: '#3399cc'
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      
+      rzp.on('payment.failed', (response) => {
+        console.error('Payment failed:', response);
+        toast.error(`Payment failed: ${response.error.description}`);
+      });
+      
+      rzp.open();
+
+    } catch (error) {
+      console.error('Payment Error:', {
+        error: error.message,
+        response: error.response?.data,
+        planId
+      });
+      
+      let errorMessage = 'Payment processing failed';
+      if (error.response) {
+        errorMessage = error.response.data?.message || errorMessage;
+        if (error.response.status === 401) {
+          logout();
+        }
+      } else if (error.request) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    
-    toast.error(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [user, token, backendUrl, loadCreditsData, setShowLogin, logout]);
 
   return (
     <motion.div
@@ -195,14 +201,14 @@ const handlePayment = async (planId) => {
       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
         {plans.map((item, index) => (
           <div key={index} style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', width: '250px' }}>
-<img
-  src="/assets/logo_icon.svg"
-  alt="Logo Icon"
-  width={50}  // React style width
-  height={50} // React style height
-  style={{ display: 'block' }}
-/>
-                 <h3>{item.desc}</h3>
+            <img
+              src="/assets/logo_icon.svg"
+              alt="Logo Icon"
+              width={50}
+              height={50}
+              style={{ display: 'block' }}
+            />
+            <h3>{item.desc}</h3>
             <p>₹{item.price.toLocaleString()}</p>
             <p>{item.credits} credits</p>
             <button 
@@ -226,4 +232,4 @@ const handlePayment = async (planId) => {
   );
 };
 
-export default BuyCredit; 
+export default BuyCredit;
