@@ -1182,7 +1182,7 @@ background-color: transparent;
     font-family: Outfit;
 align-items: flex-start;
 margin: 3px;
-/* padding-right: 5px; */
+padding-right: 0px;
 border-radius: 19px;
 }
 
@@ -1257,7 +1257,7 @@ padding-top: 0px;
     font-family: Outfit;
 align-items: flex-start;
 margin: 0px;
-padding-right: 5px;
+padding-right: 0px;
 }}
 
 /* result */
