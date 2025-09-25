@@ -52,7 +52,8 @@ const AppContextProvider = ({ children }) => {
         }
       }
     } catch (error) {
-      if (axios.isCancel(error)) return;
+      if (axios.isCancel(error)) 
+        return;
       
       console.error("Error loading credits:", error);
       
